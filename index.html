@@ -878,14 +878,27 @@ function setupWebview() {
   }
 
   webview.addEventListener('did-fail-load', async (e) => {
-    if (e.errorCode === -3 || e.errorCode === -105) return; // cancelled / connection closed
+    if (e.errorCode === -3) {
+      // Navigation aborted — usually replaced by error page. Still update URL bar.
+      if (e.validatedURL && !e.validatedURL.startsWith('data:') && !e.validatedURL.startsWith('about:')) {
+        currentURL = e.validatedURL;
+        document.getElementById('url-bar').value = currentURL;
+      }
+      return;
+    }
     // Don't run error recovery on data: or about: URLs
     if (e.validatedURL && (e.validatedURL.startsWith('data:') || e.validatedURL.startsWith('about:'))) return;
     await showErrorPage(e.validatedURL, e.errorDescription);
   });
 
   webview.addEventListener('did-fail-provisional-load', async (e) => {
-    if (e.errorCode === -3 || e.errorCode === -105) return;
+    if (e.errorCode === -3) {
+      if (e.validatedURL && !e.validatedURL.startsWith('data:') && !e.validatedURL.startsWith('about:')) {
+        currentURL = e.validatedURL;
+        document.getElementById('url-bar').value = currentURL;
+      }
+      return;
+    }
     const failedUrl = e.validatedURL || currentURL;
     if (failedUrl && (failedUrl.startsWith('data:') || failedUrl.startsWith('about:'))) return;
     await showErrorPage(failedUrl, e.errorDescription);
@@ -990,7 +1003,11 @@ function saveLastURL(url) {
 // ============================================================
 
 async function toggleBookmark() {
-  const url = currentURL;
+  // Try currentURL first, fall back to URL bar value (for failed navigations)
+  let url = currentURL;
+  if (!url || url === 'about:blank' || url.startsWith('data:')) {
+    url = document.getElementById('url-bar').value.trim();
+  }
   if (!url || url === 'about:blank' || url.startsWith('data:')) {
     showToast('无法收藏此页面');
     return;
