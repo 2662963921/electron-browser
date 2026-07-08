@@ -60,7 +60,7 @@ const defaultConfig = {
 let config = { ...defaultConfig };
 
 function getConfigPath() {
-  return path.join(app.getPath('userData'), 'browser-config.json');
+  return path.join(__dirname, 'config.json');
 }
 
 function loadConfig() {
@@ -385,26 +385,30 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  // Save last URL before quit (old handler logic merged here)
+  if (trackedLastURL) {
+    config.lastURL = trackedLastURL;
+    saveConfig(config);
+  }
   cleanupWebviewProcesses();
   globalShortcut.unregisterAll();
   if (process.platform !== 'darwin') app.quit();
-});
-
-app.on('before-quit', () => {
-  cleanupWebviewProcesses();
-  globalShortcut.unregisterAll();
-});
-
-app.on('will-quit', () => {
-  cleanupWebviewProcesses();
-  globalShortcut.unregisterAll();
 });
 
 // ============================================================
 //  Security: Prevent webview from opening system dialogs
 // ============================================================
 
+let trackedLastURL = '';
+
 app.on('web-contents-created', (_event, contents) => {
+  // Track last navigated URL for save-on-close
+  contents.on('did-navigate', (_e, url) => {
+    if (url && url !== 'about:blank' && !url.startsWith('data:')) {
+      trackedLastURL = url;
+    }
+  });
+
   // Intercept new window requests from webview
   contents.setWindowOpenHandler(({ url }) => {
     // Navigate in the main webview instead
@@ -418,4 +422,14 @@ app.on('web-contents-created', (_event, contents) => {
   contents.session.setPermissionRequestHandler((_webContents, _permission, callback) => {
     callback(false);
   });
+});
+
+// Save last URL when app closes
+app.on('before-quit', () => {
+  if (trackedLastURL) {
+    config.lastURL = trackedLastURL;
+    saveConfig(config);
+  }
+  cleanupWebviewProcesses();
+  globalShortcut.unregisterAll();
 });

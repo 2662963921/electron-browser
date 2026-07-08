@@ -721,11 +721,16 @@ async function init() {
   applyConfig();
   setupWebview();
 
-  // Restore last URL if configured
+  // Restore last URL if configured, otherwise go to homepage
   if (config.restoreLastURL && config.lastURL && config.lastURL !== 'about:blank') {
+    console.log('Restoring last URL:', config.lastURL);
     navigateTo(config.lastURL);
-  } else if (config.homepage && config.homepage !== 'about:blank' && currentURL === 'about:blank') {
-    navigateTo(config.homepage);
+  } else {
+    const target = (config.homepage && config.homepage !== 'about:blank')
+      ? config.homepage
+      : 'https://www.bing.com';
+    console.log('Navigating to:', target);
+    navigateTo(target);
   }
 }
 
@@ -753,6 +758,7 @@ async function applyConfig() {
 
 function applyTheme() {
   document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+  syncWebviewDarkMode();
 }
 
 async function applyControlsHidden() {
@@ -802,6 +808,47 @@ function injectHideScrollbarCSS() {
   } catch (_) {}
 }
 
+// --- Webview Dark Mode (JavaScript injection with unique style ID) ---
+function injectWebviewDarkMode() {
+  removeWebviewDarkMode();
+  try {
+    webview.executeJavaScript(`
+      (function() {
+        var old = document.getElementById('__wb_darkmode');
+        if (old) old.remove();
+        var style = document.createElement('style');
+        style.id = '__wb_darkmode';
+        style.textContent = [
+          'html { filter: invert(1) hue-rotate(180deg) !important; }',
+          'img, video, picture, canvas, svg, [style*="background-image"] {',
+          '  filter: invert(1) hue-rotate(180deg) !important;',
+          '}'
+        ].join('\\n');
+        document.head.appendChild(style);
+      })();
+    `);
+  } catch (_) {}
+}
+
+function removeWebviewDarkMode() {
+  try {
+    webview.executeJavaScript(`
+      (function() {
+        var old = document.getElementById('__wb_darkmode');
+        if (old) old.remove();
+      })();
+    `);
+  } catch (_) {}
+}
+
+function syncWebviewDarkMode() {
+  if (darkMode) {
+    injectWebviewDarkMode();
+  } else {
+    removeWebviewDarkMode();
+  }
+}
+
 async function updateMaxBtn(maximized) {
   const btn = document.getElementById('btn-max');
   if (maximized === undefined) {
@@ -840,10 +887,13 @@ function setupWebview() {
     updateNavButtons();
   });
 
-  // Re-inject transparent CSS on every page load (navigation clears injected CSS)
+  // Re-inject CSS on every page load (navigation clears injected CSS)
   webview.addEventListener('did-finish-load', () => {
     if (controlsHidden && config.transparentBg) {
       injectWebviewTransparentCSS();
+    }
+    if (darkMode) {
+      injectWebviewDarkMode();
     }
   });
 
