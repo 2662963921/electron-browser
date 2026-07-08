@@ -68,8 +68,10 @@ function loadConfig() {
     if (fs.existsSync(configPath)) {
       const raw = fs.readFileSync(configPath, 'utf-8');
       config = { ...defaultConfig, ...JSON.parse(raw) };
+      console.log('Config loaded from:', configPath);
       return;
     }
+    console.log('No saved config found, using defaults');
   } catch (e) {
     console.error('Failed to load config:', e.message);
   }
@@ -82,6 +84,7 @@ function saveConfig(cfg) {
     const dir = path.dirname(configPath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(configPath, JSON.stringify(cfg || config, null, 2), 'utf-8');
+    console.log('Config saved to:', configPath);
   } catch (e) {
     console.error('Failed to save config:', e.message);
   }
@@ -359,6 +362,9 @@ function escapeHTML(str) {
 // ============================================================
 
 app.whenReady().then(() => {
+  // Load saved config from disk FIRST
+  loadConfig();
+
   killExistingWebviewProcesses();
   setupIPC();
   createWindow();
