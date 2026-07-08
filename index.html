@@ -722,16 +722,20 @@ async function init() {
   setupWebview();
 
   // Restore last URL if configured, otherwise go to homepage
-  if (config.restoreLastURL && config.lastURL && config.lastURL !== 'about:blank') {
-    console.log('Restoring last URL:', config.lastURL);
-    navigateTo(config.lastURL);
-  } else {
-    const target = (config.homepage && config.homepage !== 'about:blank')
-      ? config.homepage
-      : 'https://www.bing.com';
-    console.log('Navigating to:', target);
-    navigateTo(target);
-  }
+  // Use dom-ready to ensure webview is initialized before navigating
+  webview.addEventListener('dom-ready', function initialNav() {
+    webview.removeEventListener('dom-ready', initialNav);
+    if (config.restoreLastURL && config.lastURL && config.lastURL !== 'about:blank') {
+      console.log('Restoring last URL:', config.lastURL);
+      navigateTo(config.lastURL);
+    } else {
+      const target = (config.homepage && config.homepage !== 'about:blank')
+        ? config.homepage
+        : 'https://www.bing.com';
+      console.log('Navigating to:', target);
+      navigateTo(target);
+    }
+  }, { once: true });
 }
 
 async function applyConfig() {
@@ -771,13 +775,16 @@ async function applyControlsHidden() {
 }
 
 function updateTransparentMode() {
-  if (controlsHidden && config.transparentBg) {
+  const transparent = controlsHidden && config.transparentBg;
+  if (transparent) {
     document.body.classList.add('transparent-mode');
   } else {
     document.body.classList.remove('transparent-mode');
   }
-  // Inject transparent CSS into webview
-  if (controlsHidden && config.transparentBg) {
+  // Set webview background via IPC (main process sets webContents backgroundColor)
+  api.setWebviewBg(transparent ? '#00000000' : '#FFFFFFFF');
+  // Inject/remove transparent CSS into webview content
+  if (transparent) {
     injectWebviewTransparentCSS();
   } else {
     removeWebviewTransparentCSS();
@@ -1215,20 +1222,21 @@ function applyDragResizeZones() {
   const w = window.innerWidth;
   const h = window.innerHeight;
 
-  // Drag zone: always at top of the visible area (titlebar when shown, webview top when hidden)
-  // Resize zone: always at bottom-right corner of the window
-  const dragAreaPct = controlsHidden
-    ? { width: config.dragAreaPercent.width || 15, height: config.dragAreaPercent.height || 8 }
-    : config.dragAreaPercent;
-  const resizeAreaPct = controlsHidden
-    ? { width: config.resizeAreaPercent.width || 8, height: config.resizeAreaPercent.height || 8 }
-    : config.resizeAreaPercent;
+  // Only activate drag/resize zones when in frameless mode (controls hidden)
+  if (!controlsHidden) {
+    dragZone.style.width = '0';
+    dragZone.style.height = '0';
+    dragZone.classList.remove('active');
+    resizeZone.style.width = '0';
+    resizeZone.style.height = '0';
+    resizeZone.classList.remove('active');
+    return;
+  }
 
-  const dragW = Math.round(w * dragAreaPct.width / 100);
-  const dragH = Math.round(h * dragAreaPct.height / 100);
-  const resizeW = Math.round(w * resizeAreaPct.width / 100);
-  const resizeH = Math.round(h * resizeAreaPct.height / 100);
-
+  // Drag zone: top-left corner of the window (over webview)
+  const dragPct = config.dragAreaPercent || { width: 15, height: 8 };
+  const dragW = Math.round(w * dragPct.width / 100);
+  const dragH = Math.round(h * dragPct.height / 100);
   if (dragW > 0 && dragH > 0) {
     dragZone.style.top = '0';
     dragZone.style.left = '0';
@@ -1241,6 +1249,10 @@ function applyDragResizeZones() {
     dragZone.classList.remove('active');
   }
 
+  // Resize zone: bottom-right corner of the window (over webview)
+  const resizePct = config.resizeAreaPercent || { width: 8, height: 8 };
+  const resizeW = Math.round(w * resizePct.width / 100);
+  const resizeH = Math.round(h * resizePct.height / 100);
   if (resizeW > 0 && resizeH > 0) {
     resizeZone.style.bottom = '0';
     resizeZone.style.right = '0';
@@ -1393,6 +1405,18 @@ document.addEventListener('keyup', (e) => {
 });
 
 document.addEventListener('mousedown', async (e) => {
+  // Mouse side buttons: XButton1 (button 3) → Back, XButton2 (button 4) → Forward
+  if (e.button === 3) {
+    e.preventDefault();
+    goBack();
+    return;
+  }
+  if (e.button === 4) {
+    e.preventDefault();
+    goForward();
+    return;
+  }
+
   // Track button states for combo detection
   mouseButtonsDown |= (1 << (e.button));
 

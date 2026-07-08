@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld('browserAPI', {
   setWebviewId: (id) => ipcRenderer.invoke('set-webview-id', id),
   getErrorHTML: (info) => ipcRenderer.invoke('get-error-html', info),
   openExternal: (url) => ipcRenderer.send('open-external', url),
+  setWebviewBg: (color) => ipcRenderer.send('set-webview-bg', color),
 
   // --- Event Listeners ---
   onInitConfig: (callback) => {

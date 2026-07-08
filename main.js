@@ -317,6 +317,13 @@ function setupIPC() {
     shortcutActions.toggleDarkMode();
   });
 
+  // --- Webview Background (transparency) ---
+  ipcMain.on('set-webview-bg', (_event, color) => {
+    if (webviewContents) {
+      try { webviewContents.setBackgroundColor(color); } catch (_) {}
+    }
+  });
+
   // --- Controls Visibility ---
   ipcMain.on('toggle-controls-hidden', () => {
     shortcutActions.hideControls();
@@ -400,8 +407,14 @@ app.on('window-all-closed', () => {
 // ============================================================
 
 let trackedLastURL = '';
+let webviewContents = null;
 
 app.on('web-contents-created', (_event, contents) => {
+  // Track webview contents for background transparency control
+  if (contents.getType() === 'webview') {
+    webviewContents = contents;
+  }
+
   // Track last navigated URL for save-on-close
   contents.on('did-navigate', (_e, url) => {
     if (url && url !== 'about:blank' && !url.startsWith('data:')) {
