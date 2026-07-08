@@ -753,7 +753,6 @@ async function applyConfig() {
 
 function applyTheme() {
   document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
-  syncWebviewTheme();
 }
 
 async function applyControlsHidden() {
@@ -780,12 +779,11 @@ function updateTransparentMode() {
 }
 
 let transparentCSSKey = null;
-let darkModeCSSKey = null;
 
 function injectWebviewTransparentCSS() {
   removeWebviewTransparentCSS();
   try {
-    webview.insertCSS('html, body { background: transparent !important; } ::-webkit-scrollbar { display: none !important; }')
+    webview.insertCSS('* { background-color: transparent !important; } ::-webkit-scrollbar { display: none !important; }')
       .then(key => { transparentCSSKey = key; })
       .catch(() => {});
   } catch (_) {}
@@ -798,37 +796,10 @@ function removeWebviewTransparentCSS() {
   }
 }
 
-function injectWebviewDarkCSS() {
-  removeWebviewDarkCSS();
-  try {
-    webview.insertCSS(`
-      html { filter: invert(0.9) hue-rotate(180deg) !important; }
-      img, video, canvas, [style*="background-image"], iframe {
-        filter: invert(1) hue-rotate(180deg) !important;
-      }
-    `).then(key => { darkModeCSSKey = key; }).catch(() => {});
-  } catch (_) {}
-}
-
-function removeWebviewDarkCSS() {
-  if (darkModeCSSKey) {
-    try { webview.removeInsertedCSS(darkModeCSSKey); } catch (_) {}
-    darkModeCSSKey = null;
-  }
-}
-
 function injectHideScrollbarCSS() {
   try {
     webview.insertCSS('::-webkit-scrollbar { display: none !important; }').catch(() => {});
   } catch (_) {}
-}
-
-function syncWebviewTheme() {
-  if (darkMode) {
-    injectWebviewDarkCSS();
-  } else {
-    removeWebviewDarkCSS();
-  }
 }
 
 async function updateMaxBtn(maximized) {
@@ -867,6 +838,13 @@ function setupWebview() {
     isLoading = false;
     document.getElementById('url-bar').classList.remove('loading');
     updateNavButtons();
+  });
+
+  // Re-inject transparent CSS on every page load (navigation clears injected CSS)
+  webview.addEventListener('did-finish-load', () => {
+    if (controlsHidden && config.transparentBg) {
+      injectWebviewTransparentCSS();
+    }
   });
 
   webview.addEventListener('did-navigate', (e) => {

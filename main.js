@@ -28,6 +28,7 @@ const {
   BrowserWindow,
   ipcMain,
   globalShortcut,
+  nativeTheme,
   shell,
 } = require('electron');
 const path = require('path');
@@ -195,7 +196,12 @@ function killExistingWebviewProcesses() {
 
 const shortcutActions = {
   closeWindow:       () => { if (mainWindow) mainWindow.close(); },
-  toggleDarkMode:    () => { config.darkMode = !config.darkMode; saveConfig(config); syncDarkMode(); },
+  toggleDarkMode:    () => {
+    config.darkMode = !config.darkMode;
+    nativeTheme.themeSource = config.darkMode ? 'dark' : 'light';
+    saveConfig(config);
+    syncDarkMode();
+  },
   hideControls:      () => { config.controlsHidden = !config.controlsHidden; saveConfig(config); syncControlsHidden(); },
   toggleAlwaysOnTop: () => {
     config.alwaysOnTop = !config.alwaysOnTop;
@@ -364,6 +370,9 @@ function escapeHTML(str) {
 app.whenReady().then(() => {
   // Load saved config from disk FIRST
   loadConfig();
+
+  // Apply Chrome native dark mode based on saved config
+  nativeTheme.themeSource = config.darkMode ? 'dark' : 'light';
 
   killExistingWebviewProcesses();
   setupIPC();
