@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>页面加载失败</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    user-select: none;
+  }
+  .error-container {
+    text-align: center;
+    padding: 40px;
+    max-width: 500px;
+  }
+  .error-icon {
+    font-size: 64px;
+    margin-bottom: 20px;
+    opacity: 0.6;
+  }
+  .error-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #ff6b6b;
+  }
+  .error-url {
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 8px;
+    word-break: break-all;
+  }
+  .error-desc {
+    font-size: 14px;
+    color: #aaa;
+    margin-bottom: 24px;
+  }
+  .error-btn {
+    display: inline-block;
+    padding: 8px 24px;
+    background: #4a6cf7;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    text-decoration: none;
+  }
+  .error-btn:hover {
+    background: #3b5de7;
+  }
+</style>
+</head>
+<body>
+  <div class="error-container">
+    <div class="error-icon">:(</div>
+    <div class="error-title">页面加载失败</div>
+    <div class="error-url">{{URL}}</div>
+    <div class="error-desc">{{ERROR}}</div>
+    <button class="error-btn" onclick="history.back()">返回上一页</button>
+  </div>
+</body>
+</html>

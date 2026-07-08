@@ -1,0 +1,1507 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; connect-src *;">
+<title>网页浏览器</title>
+<style>
+/* ============================================================
+   CSS Variables - Light & Dark Themes
+   ============================================================ */
+:root {
+  --bg-primary: #f0f2f5;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e8eaed;
+  --bg-hover: #e0e2e6;
+  --bg-input: #ffffff;
+  --bg-dropdown: #ffffff;
+  --bg-tooltip: #333333;
+  --text-primary: #1a1a2e;
+  --text-secondary: #555555;
+  --text-muted: #888888;
+  --text-on-dark: #ffffff;
+  --border-color: #d0d0d0;
+  --border-light: #e0e0e0;
+  --accent: #4a6cf7;
+  --accent-hover: #3b5de7;
+  --accent-light: #e8edff;
+  --danger: #e74c3c;
+  --danger-hover: #c0392b;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.12);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.16);
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --toolbar-height: 46px;
+  --transition-fast: 0.15s ease;
+  --control-btn-hover: rgba(0,0,0,0.06);
+}
+
+[data-theme="dark"] {
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --bg-tertiary: #0f3460;
+  --bg-hover: #1a3a6e;
+  --bg-input: #0d1b3e;
+  --bg-dropdown: #16213e;
+  --bg-tooltip: #e0e0e0;
+  --text-primary: #e0e0e0;
+  --text-secondary: #aaa;
+  --text-muted: #777;
+  --text-on-dark: #1a1a2e;
+  --border-color: #2a3a5e;
+  --border-light: #233056;
+  --accent: #7b8cff;
+  --accent-hover: #6a7bf0;
+  --accent-light: #1a2a4e;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+  --control-btn-hover: rgba(255,255,255,0.08);
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background 0.3s, color 0.3s;
+  user-select: none;
+}
+
+/* ============================================================
+   App Layout
+   ============================================================ */
+#app {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-primary);
+  transition: background 0.3s;
+}
+
+/* Title Bar */
+#titlebar {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-light);
+  -webkit-app-region: drag;
+  flex-shrink: 0;
+  padding: 0 4px 0 12px;
+}
+#titlebar .title-text {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#titlebar .win-controls {
+  display: flex;
+  -webkit-app-region: no-drag;
+}
+.win-btn {
+  width: 34px; height: 26px;
+  border: none; background: transparent;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+  border-radius: 4px;
+  transition: background var(--transition-fast);
+}
+.win-btn:hover { background: var(--control-btn-hover); }
+.win-btn.close:hover { background: var(--danger); color: #fff; }
+
+/* Toolbar */
+#toolbar {
+  display: flex;
+  align-items: center;
+  height: var(--toolbar-height);
+  padding: 0 8px;
+  gap: 4px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-light);
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+  transition: height 0.2s, opacity 0.2s, padding 0.2s, margin 0.2s;
+}
+#toolbar.hidden {
+  height: 0; opacity: 0; padding: 0; margin: 0; overflow: hidden; border: none;
+}
+
+/* Toolbar Buttons */
+.tool-btn {
+  width: 32px; height: 32px;
+  border: none; background: transparent;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-secondary);
+  font-size: 16px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+.tool-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.tool-btn:active { transform: scale(0.95); }
+.tool-btn:disabled { opacity: 0.35; cursor: default; }
+.tool-btn:disabled:hover { background: transparent; }
+.tool-btn.active { color: var(--accent); background: var(--accent-light); }
+
+.tool-sep {
+  width: 1px; height: 20px;
+  background: var(--border-light);
+  margin: 0 2px;
+  flex-shrink: 0;
+}
+
+/* URL Bar */
+#url-bar-wrap {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 120px;
+}
+#url-bar {
+  width: 100%; height: 32px;
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 0 36px 0 14px;
+  font-size: 13px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+#url-bar:focus {
+  border-color: var(--accent);
+  background: var(--bg-secondary);
+}
+#url-go-btn {
+  position: absolute; right: 2px;
+  width: 30px; height: 28px;
+  border: none; background: transparent;
+  cursor: pointer; color: var(--accent);
+  font-size: 14px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+#url-go-btn:hover { background: var(--accent-light); }
+
+/* Bookmark Dropdown */
+#bookmark-dropdown-wrap {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+#bookmark-dropdown {
+  position: absolute;
+  top: 40px; right: 0;
+  width: 280px; max-height: 320px;
+  overflow-y: auto;
+  background: var(--bg-dropdown);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
+  display: none;
+  padding: 6px 0;
+}
+#bookmark-dropdown.show { display: block; }
+.bkm-item {
+  display: flex; align-items: center;
+  padding: 8px 14px;
+  cursor: pointer;
+  gap: 10px;
+  transition: background var(--transition-fast);
+}
+.bkm-item:hover { background: var(--bg-hover); }
+.bkm-item .bkm-icon {
+  width: 20px; height: 20px;
+  font-size: 12px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+.bkm-item .bkm-info { flex: 1; min-width: 0; }
+.bkm-item .bkm-title {
+  font-size: 13px; font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bkm-item .bkm-url {
+  font-size: 11px; color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bkm-item .bkm-del {
+  width: 24px; height: 24px;
+  border: none; background: transparent;
+  cursor: pointer; color: var(--text-muted);
+  font-size: 12px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  opacity: 1;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.bkm-item .bkm-del:hover { background: var(--danger); color: #fff; }
+#bookmark-empty {
+  padding: 20px; text-align: center;
+  color: var(--text-muted); font-size: 13px;
+}
+
+/* Settings Dropdown */
+#settings-dropdown-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+#settings-dropdown {
+  position: absolute;
+  top: 40px; right: 0;
+  width: 360px; max-height: 520px;
+  overflow-y: auto;
+  background: var(--bg-dropdown);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
+  display: none;
+  padding: 0;
+}
+#settings-dropdown.show { display: block; }
+
+.settings-section {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-light);
+}
+.settings-section:last-child { border-bottom: none; }
+.settings-section h4 {
+  font-size: 12px; font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  letter-spacing: 0.5px;
+}
+
+/* Shortcut Item */
+.shortcut-item {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  gap: 10px;
+}
+.shortcut-item .sc-label {
+  font-size: 13px;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+.shortcut-item .sc-combo {
+  font-size: 12px;
+  padding: 4px 10px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  min-width: 120px;
+  text-align: center;
+  font-family: 'Consolas', 'Courier New', monospace;
+  transition: all var(--transition-fast);
+}
+.shortcut-item .sc-combo:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.shortcut-item .sc-combo.recording {
+  border-color: var(--danger);
+  color: var(--danger);
+  animation: pulse 1s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.shortcut-item .sc-reset {
+  width: 24px; height: 24px;
+  border: none; background: transparent;
+  cursor: pointer; color: var(--text-muted);
+  font-size: 12px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.shortcut-item .sc-reset:hover { background: var(--bg-hover); color: var(--danger); }
+
+/* Settings Controls */
+.setting-row {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+}
+.setting-row label {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.setting-row input[type="checkbox"] {
+  width: 18px; height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.range-group {
+  display: flex; align-items: center; gap: 8px;
+}
+.range-group input[type="range"] {
+  width: 100px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.range-group .range-val {
+  font-size: 12px; color: var(--text-secondary);
+  min-width: 36px; text-align: right;
+}
+
+/* ============================================================
+   WebView Container
+   ============================================================ */
+#webview-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+#webview-container webview {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+#webview-container webview::shadow ::-webkit-scrollbar {
+  display: none;
+}
+
+/* ============================================================
+   Drag & Resize Zones
+   ============================================================ */
+#drag-zone {
+  position: fixed;
+  top: 0; left: 0;
+  z-index: 9999;
+  pointer-events: none;
+  -webkit-app-region: no-drag;
+  transition: background var(--transition-fast);
+}
+#drag-zone.active { pointer-events: all; -webkit-app-region: drag; cursor: move; }
+
+#resize-zone {
+  position: fixed;
+  bottom: 0; right: 0;
+  z-index: 9999;
+  pointer-events: none;
+  transition: background var(--transition-fast);
+}
+#resize-zone.active { pointer-events: all; cursor: nwse-resize; }
+
+/* ============================================================
+   Controls Hidden Mode
+   ============================================================ */
+body.controls-hidden #titlebar { display: none; }
+body.controls-hidden #toolbar { height: 0; opacity: 0; padding: 0; overflow: hidden; border: none; }
+body.controls-hidden #app { border-radius: 0; }
+
+/* ============================================================
+   Transparent Mode
+   ============================================================ */
+body.transparent-mode {
+  background: transparent !important;
+}
+body.transparent-mode #app {
+  background: transparent !important;
+}
+body.transparent-mode #webview-container {
+  background: transparent !important;
+}
+
+/* ============================================================
+   Toast Notifications
+   ============================================================ */
+#toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-tooltip);
+  color: var(--text-on-dark);
+  padding: 10px 24px;
+  border-radius: 20px;
+  font-size: 13px;
+  opacity: 0;
+  transition: opacity 0.3s;
+  z-index: 10000;
+  pointer-events: none;
+}
+#toast.show { opacity: 1; }
+
+/* ============================================================
+   Always-on-top Indicator
+   ============================================================ */
+#pin-indicator {
+  position: fixed;
+  top: 8px; right: 120px;
+  font-size: 11px;
+  color: var(--accent);
+  background: var(--accent-light);
+  padding: 2px 8px;
+  border-radius: 10px;
+  display: none;
+  pointer-events: none;
+  z-index: 100;
+}
+#pin-indicator.show { display: block; }
+
+/* ============================================================
+   Scrollbar for Settings dropdown
+   ============================================================ */
+#settings-dropdown::-webkit-scrollbar,
+#bookmark-dropdown::-webkit-scrollbar {
+  width: 5px;
+}
+#settings-dropdown::-webkit-scrollbar-track,
+#bookmark-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+#settings-dropdown::-webkit-scrollbar-thumb,
+#bookmark-dropdown::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+/* ============================================================
+   Loading indicator in URL bar
+   ============================================================ */
+#url-bar.loading {
+  background-image: linear-gradient(
+    90deg,
+    var(--accent) 0%, var(--accent) 30%,
+    transparent 30%, transparent 100%
+  );
+  background-size: 200% 2px;
+  background-position: bottom;
+  background-repeat: no-repeat;
+  animation: loading-slide 1.5s infinite;
+}
+@keyframes loading-slide {
+  0% { background-position: -200% bottom; }
+  100% { background-position: 200% bottom; }
+}
+
+/* ============================================================
+   Dropdown overlay (click outside to close)
+   ============================================================ */
+.dropdown-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 999;
+  display: none;
+}
+.dropdown-overlay.show { display: block; }
+</style>
+</head>
+<body>
+  <!-- ============================================================
+       App Layout
+       ============================================================ -->
+  <div id="app">
+    <!-- Title Bar -->
+    <div id="titlebar">
+      <span class="title-text" id="title-text">网页浏览器</span>
+      <div class="win-controls">
+        <button class="win-btn" id="btn-min" title="最小化" onclick="window.browserAPI.minimizeWindow()">&#x2014;</button>
+        <button class="win-btn" id="btn-max" title="最大化" onclick="window.browserAPI.maximizeWindow()">&#x25A1;</button>
+        <button class="win-btn close" id="btn-close" title="关闭" onclick="window.browserAPI.closeWindow()">&#x2715;</button>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div id="toolbar">
+      <button class="tool-btn" id="btn-back" title="后退" onclick="goBack()">&#x25C0;</button>
+      <button class="tool-btn" id="btn-forward" title="前进" onclick="goForward()">&#x25B6;</button>
+      <button class="tool-btn" id="btn-refresh" title="刷新" onclick="refresh()">&#x21BB;</button>
+      <button class="tool-btn" id="btn-home" title="主页" onclick="goHome()">&#x2302;</button>
+
+      <span class="tool-sep"></span>
+
+      <div id="url-bar-wrap">
+        <input type="text" id="url-bar" placeholder="输入网址或搜索..." spellcheck="false">
+        <button id="url-go-btn" title="转到" onclick="navigateToUrl()">&#x2192;</button>
+      </div>
+
+      <span class="tool-sep"></span>
+
+      <div id="bookmark-dropdown-wrap">
+        <button class="tool-btn" id="btn-bookmark" title="收藏" onclick="toggleBookmark()">&#x2606;</button>
+        <button class="tool-btn" id="btn-bookmark-list" title="收藏列表" onclick="toggleBookmarkDropdown()">&#x25BE;</button>
+        <div id="bookmark-dropdown">
+          <div id="bookmark-empty">暂无收藏</div>
+        </div>
+      </div>
+
+      <span class="tool-sep"></span>
+
+      <div id="settings-dropdown-wrap">
+        <button class="tool-btn" id="btn-settings" title="设置" onclick="toggleSettingsDropdown()">&#x2699;</button>
+        <div id="settings-dropdown">
+          <!-- Shortcuts Section -->
+          <div class="settings-section">
+            <h4>快捷键设置（键盘/鼠标）</h4>
+            <div id="shortcut-list"></div>
+          </div>
+          <!-- Transparency Section -->
+          <div class="settings-section">
+            <h4>透明度</h4>
+            <div class="setting-row">
+              <label for="chk-transparent">隐藏控件时背景全透明</label>
+              <input type="checkbox" id="chk-transparent" onchange="onTransparentToggle()">
+            </div>
+          </div>
+          <!-- Restore last URL Section -->
+          <div class="settings-section">
+            <h4>启动行为</h4>
+            <div class="setting-row">
+              <label for="chk-restore-url">启动时恢复上次关闭的网页</label>
+              <input type="checkbox" id="chk-restore-url" onchange="onRestoreUrlToggle()">
+            </div>
+          </div>
+          <!-- Drag / Resize Area Section -->
+          <div class="settings-section">
+            <h4>拖动区域（左上角）</h4>
+            <div class="setting-row">
+              <label>宽度 %</label>
+              <div class="range-group">
+                <input type="range" id="range-drag-w" min="0" max="50" value="15" oninput="onDragAreaChange()">
+                <span class="range-val" id="val-drag-w">15%</span>
+              </div>
+            </div>
+            <div class="setting-row">
+              <label>高度 %</label>
+              <div class="range-group">
+                <input type="range" id="range-drag-h" min="0" max="30" value="8" oninput="onDragAreaChange()">
+                <span class="range-val" id="val-drag-h">8%</span>
+              </div>
+            </div>
+          </div>
+          <div class="settings-section">
+            <h4>缩放区域（右下角）</h4>
+            <div class="setting-row">
+              <label>宽度 %</label>
+              <div class="range-group">
+                <input type="range" id="range-resize-w" min="0" max="30" value="8" oninput="onResizeAreaChange()">
+                <span class="range-val" id="val-resize-w">8%</span>
+              </div>
+            </div>
+            <div class="setting-row">
+              <label>高度 %</label>
+              <div class="range-group">
+                <input type="range" id="range-resize-h" min="0" max="30" value="8" oninput="onResizeAreaChange()">
+                <span class="range-val" id="val-resize-h">8%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WebView Container -->
+    <div id="webview-container">
+      <webview id="main-webview"
+        src="about:blank"
+        allowpopups="false"
+        nodeintegration="false"
+        webpreferences="contextIsolation=true"
+        style="width:100%;height:100%">
+      </webview>
+    </div>
+  </div>
+
+  <!-- Drag Zone (top-left) -->
+  <div id="drag-zone"></div>
+
+  <!-- Resize Zone (bottom-right) -->
+  <div id="resize-zone"></div>
+
+  <!-- Pin Indicator -->
+  <div id="pin-indicator">&#x1F4CC; 已置顶</div>
+
+  <!-- Toast -->
+  <div id="toast"></div>
+
+  <!-- Dropdown overlay for click-outside -->
+  <div class="dropdown-overlay" id="dropdown-overlay" onclick="closeAllDropdowns()"></div>
+
+<script>
+// ============================================================
+//  State
+// ============================================================
+
+const api = window.browserAPI;
+const webview = document.getElementById('main-webview');
+let currentURL = 'about:blank';
+let currentTitle = '网页浏览器';
+let isLoading = false;
+let config = null;
+let bookmarks = [];
+let shortcuts = {};
+let controlsHidden = false;
+let alwaysOnTop = false;
+let darkMode = false;
+
+// Shortcut action labels
+const shortcutLabels = {
+  closeWindow: '关闭窗口',
+  toggleDarkMode: '切换夜间/日间模式',
+  hideControls: '隐藏/显示控件',
+  toggleAlwaysOnTop: '置顶/取消置顶',
+};
+
+// ============================================================
+//  Initialization
+// ============================================================
+
+async function init() {
+  // Listen for IPC events
+  api.onInitConfig(async (cfg) => {
+    config = cfg;
+    await applyConfig();
+  });
+
+  api.onDarkModeChanged(async (dark) => {
+    darkMode = dark;
+    applyTheme();
+  });
+
+  api.onControlsHiddenChanged(async (hidden) => {
+    controlsHidden = hidden;
+    applyControlsHidden();
+    applyDragResizeZones();
+  });
+
+  api.onWindowStateChanged(({ maximized }) => {
+    updateMaxBtn(maximized);
+  });
+
+  api.onAlwaysOnTopChanged((onTop) => {
+    alwaysOnTop = onTop;
+    updatePinIndicator();
+  });
+
+  api.onNavigateToUrl((url) => {
+    navigateTo(url);
+  });
+
+  // Get initial state
+  config = await api.getConfig();
+  bookmarks = config.bookmarks || [];
+  shortcuts = config.shortcuts || {};
+  darkMode = config.darkMode;
+  controlsHidden = config.controlsHidden;
+  alwaysOnTop = config.alwaysOnTop;
+
+  applyConfig();
+  setupWebview();
+
+  // Restore last URL if configured
+  if (config.restoreLastURL && config.lastURL && config.lastURL !== 'about:blank') {
+    navigateTo(config.lastURL);
+  } else if (config.homepage && config.homepage !== 'about:blank') {
+    document.getElementById('url-bar').value = config.homepage;
+  }
+}
+
+async function applyConfig() {
+  darkMode = config.darkMode;
+  controlsHidden = config.controlsHidden;
+  alwaysOnTop = config.alwaysOnTop;
+  bookmarks = config.bookmarks || [];
+  shortcuts = config.shortcuts || {};
+
+  applyTheme();
+  applyControlsHidden();
+  applyDragResizeZones();
+  updatePinIndicator();
+  updateBookmarkBtn();
+  renderBookmarkDropdown();
+  renderShortcutsList();
+  updateSettingsControls();
+
+  // Set homepage in URL bar
+  if (currentURL === 'about:blank' && config.homepage) {
+    document.getElementById('url-bar').value = config.homepage;
+  }
+}
+
+function applyTheme() {
+  document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+}
+
+async function applyControlsHidden() {
+  if (controlsHidden) {
+    document.body.classList.add('controls-hidden');
+  } else {
+    document.body.classList.remove('controls-hidden');
+  }
+  updateTransparentMode();
+}
+
+function updateTransparentMode() {
+  if (controlsHidden && config.transparentBg) {
+    document.body.classList.add('transparent-mode');
+  } else {
+    document.body.classList.remove('transparent-mode');
+  }
+  // Inject transparent CSS into webview
+  if (controlsHidden && config.transparentBg) {
+    injectWebviewTransparentCSS();
+  } else {
+    removeWebviewTransparentCSS();
+  }
+}
+
+function injectWebviewTransparentCSS() {
+  try {
+    webview.insertCSS('html, body { background: transparent !important; } ::-webkit-scrollbar { display: none !important; }');
+  } catch (_) {}
+}
+
+function removeWebviewTransparentCSS() {
+  try {
+    webview.insertCSS('html, body { background: initial; } ::-webkit-scrollbar { display: initial; }');
+  } catch (_) {}
+}
+
+function injectHideScrollbarCSS() {
+  try {
+    webview.insertCSS('::-webkit-scrollbar { display: none !important; }');
+  } catch (_) {}
+}
+
+async function updateMaxBtn(maximized) {
+  const btn = document.getElementById('btn-max');
+  if (maximized === undefined) {
+    maximized = await api.isMaximized();
+  }
+  btn.innerHTML = maximized ? '&#x2750;' : '&#x25A1;';
+  btn.title = maximized ? 'Restore' : 'Maximize';
+}
+
+function updatePinIndicator() {
+  const el = document.getElementById('pin-indicator');
+  if (alwaysOnTop) {
+    el.classList.add('show');
+  } else {
+    el.classList.remove('show');
+  }
+}
+
+// ============================================================
+//  WebView Setup
+// ============================================================
+
+function setupWebview() {
+  api.setWebviewId(webview.getWebContentsId());
+
+  // --- Navigation Events ---
+  webview.addEventListener('did-start-loading', () => {
+    isLoading = true;
+    errorRecoveryCount = 0;
+    document.getElementById('url-bar').classList.add('loading');
+  });
+
+  webview.addEventListener('did-stop-loading', () => {
+    isLoading = false;
+    document.getElementById('url-bar').classList.remove('loading');
+    updateNavButtons();
+  });
+
+  webview.addEventListener('did-navigate', (e) => {
+    currentURL = e.url;
+    document.getElementById('url-bar').value = currentURL;
+    updateNavButtons();
+    updateBookmarkBtn();
+    saveLastURL(currentURL);
+  });
+
+  webview.addEventListener('did-navigate-in-page', (e) => {
+    if (e.isMainFrame) {
+      currentURL = e.url;
+      document.getElementById('url-bar').value = currentURL;
+      updateNavButtons();
+      saveLastURL(currentURL);
+    }
+  });
+
+  webview.addEventListener('page-title-updated', (e) => {
+    currentTitle = e.title;
+    document.getElementById('title-text').textContent = currentTitle || '网页浏览器';
+  });
+
+  // --- Error Handling ---
+  let errorRecoveryCount = 0;
+  const MAX_ERROR_RECOVERY = 3;
+
+  async function showErrorPage(failedURL, errorDesc) {
+    if (errorRecoveryCount >= MAX_ERROR_RECOVERY) {
+      // Give up, load blank
+      webview.loadURL('about:blank');
+      showToast('错误过多，加载空白页');
+      return;
+    }
+    errorRecoveryCount++;
+    try {
+      const html = await api.getErrorHTML({ url: failedURL || '', error: errorDesc || 'Unknown error' });
+      const encoded = 'data:text/html;charset=utf-8,' + encodeURIComponent(html);
+      webview.loadURL(encoded);
+    } catch (_) {
+      webview.loadURL('about:blank');
+    }
+  }
+
+  webview.addEventListener('did-fail-load', async (e) => {
+    if (e.errorCode === -3 || e.errorCode === -105) return; // cancelled / connection closed
+    // Don't run error recovery on data: or about: URLs
+    if (e.validatedURL && (e.validatedURL.startsWith('data:') || e.validatedURL.startsWith('about:'))) return;
+    await showErrorPage(e.validatedURL, e.errorDescription);
+  });
+
+  webview.addEventListener('did-fail-provisional-load', async (e) => {
+    if (e.errorCode === -3 || e.errorCode === -105) return;
+    const failedUrl = e.validatedURL || currentURL;
+    if (failedUrl && (failedUrl.startsWith('data:') || failedUrl.startsWith('about:'))) return;
+    await showErrorPage(failedUrl, e.errorDescription);
+  });
+
+  // --- Block New Windows ---
+  webview.addEventListener('new-window', (e) => {
+    e.preventDefault();
+    navigateTo(e.url);
+  });
+
+  // --- Context Menu ---
+  webview.addEventListener('context-menu', (e) => {
+    e.preventDefault();
+  });
+
+  // --- Crash Recovery ---
+  webview.addEventListener('render-process-gone', (e) => {
+    console.error('Render process gone:', e.details.reason);
+    webview.loadURL('about:blank');
+    showToast('页面崩溃，已重新加载');
+  });
+
+  webview.addEventListener('gpu-crashed', () => {
+    console.error('GPU process crashed, reloading...');
+    webview.loadURL('about:blank');
+    showToast('GPU 崩溃，页面已重载');
+  });
+
+  webview.addEventListener('destroyed', () => {
+    console.log('Webview destroyed');
+  });
+
+  // When controls hidden, inject scrollbar hiding CSS into webview
+  webview.addEventListener('dom-ready', () => {
+    if (controlsHidden) {
+      injectHideScrollbarCSS();
+    }
+  });
+}
+
+// ============================================================
+//  Navigation
+// ============================================================
+
+function goBack() {
+  if (webview.canGoBack()) webview.goBack();
+}
+
+function goForward() {
+  if (webview.canGoForward()) webview.goForward();
+}
+
+function refresh() {
+  webview.reload();
+}
+
+function goHome() {
+  navigateTo(config.homepage || 'about:blank');
+}
+
+function navigateToUrl() {
+  const input = document.getElementById('url-bar').value.trim();
+  if (!input) return;
+  navigateTo(input);
+}
+
+function navigateTo(rawUrl) {
+  let url = rawUrl.trim();
+  if (!url) return;
+
+  // Auto-prepend https:// and handle search
+  if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('about:') && !url.startsWith('data:') && !url.startsWith('file://')) {
+    if (url.includes('.') && !url.includes(' ')) {
+      url = 'https://' + url;
+    } else {
+      // Search
+      url = 'https://www.google.com/search?q=' + encodeURIComponent(url);
+    }
+  }
+
+  document.getElementById('url-bar').value = url;
+  webview.loadURL(url);
+}
+
+function updateNavButtons() {
+  document.getElementById('btn-back').disabled = !webview.canGoBack();
+  document.getElementById('btn-forward').disabled = !webview.canGoForward();
+}
+
+// Save last navigated URL for restore
+let lastURLSaveTimer = null;
+function saveLastURL(url) {
+  if (!url || url === 'about:blank' || url.startsWith('data:')) return;
+  config.lastURL = url;
+  if (lastURLSaveTimer) clearTimeout(lastURLSaveTimer);
+  lastURLSaveTimer = setTimeout(() => api.updateConfig({ lastURL: url }), 1000);
+}
+
+// ============================================================
+//  Bookmarks
+// ============================================================
+
+async function toggleBookmark() {
+  const url = currentURL;
+  if (!url || url === 'about:blank' || url.startsWith('data:')) {
+    showToast('无法收藏此页面');
+    return;
+  }
+  const isBm = await api.isBookmarked(url);
+  if (isBm) {
+    await api.removeBookmark(url);
+    showToast('已取消收藏');
+  } else {
+    await api.addBookmark({ title: currentTitle || url, url: url });
+    showToast('已添加收藏');
+  }
+  bookmarks = await api.getBookmarks();
+  updateBookmarkBtn();
+  renderBookmarkDropdown();
+}
+
+async function updateBookmarkBtn() {
+  const isBm = await api.isBookmarked(currentURL);
+  const btn = document.getElementById('btn-bookmark');
+  btn.innerHTML = isBm ? '&#x2605;' : '&#x2606;';
+  btn.classList.toggle('active', isBm);
+}
+
+function toggleBookmarkDropdown() {
+  const dd = document.getElementById('bookmark-dropdown');
+  const settingsDD = document.getElementById('settings-dropdown');
+  settingsDD.classList.remove('show');
+  const isOpen = dd.classList.toggle('show');
+  document.getElementById('dropdown-overlay').classList.toggle('show', isOpen);
+  if (isOpen) renderBookmarkDropdown();
+}
+
+function renderBookmarkDropdown() {
+  const dd = document.getElementById('bookmark-dropdown');
+  const empty = document.getElementById('bookmark-empty');
+
+  // Remove existing items except empty placeholder
+  dd.querySelectorAll('.bkm-item').forEach(el => el.remove());
+
+  if (!bookmarks || bookmarks.length === 0) {
+    empty.style.display = 'block';
+  } else {
+    empty.style.display = 'none';
+    bookmarks.forEach((bm, idx) => {
+      const item = document.createElement('div');
+      item.className = 'bkm-item';
+      item.innerHTML = `
+        <div class="bkm-icon">${bm.url.substring(0, 1).toUpperCase()}</div>
+        <div class="bkm-info">
+          <div class="bkm-title">${escapeHTML(bm.title || bm.url)}</div>
+          <div class="bkm-url">${escapeHTML(bm.url)}</div>
+        </div>
+        <button class="bkm-del" title="删除" onclick="event.stopPropagation(); deleteBookmark('${escapeAttr(bm.url)}')">&#x2715;</button>
+      `;
+      item.addEventListener('click', () => {
+        navigateTo(bm.url);
+        closeAllDropdowns();
+      });
+      dd.appendChild(item);
+    });
+  }
+}
+
+async function deleteBookmark(url) {
+  bookmarks = await api.removeBookmark(url);
+  renderBookmarkDropdown();
+  updateBookmarkBtn();
+  showToast('已删除收藏');
+}
+
+// ============================================================
+//  Settings
+// ============================================================
+
+function toggleSettingsDropdown() {
+  const dd = document.getElementById('settings-dropdown');
+  const bkmDD = document.getElementById('bookmark-dropdown');
+  bkmDD.classList.remove('show');
+  const isOpen = dd.classList.toggle('show');
+  document.getElementById('dropdown-overlay').classList.toggle('show', isOpen);
+  if (isOpen) {
+    updateSettingsControls();
+    renderShortcutsList();
+  }
+}
+
+function closeAllDropdowns() {
+  document.getElementById('settings-dropdown').classList.remove('show');
+  document.getElementById('bookmark-dropdown').classList.remove('show');
+  document.getElementById('dropdown-overlay').classList.remove('show');
+  // Stop any active shortcut recording
+  stopAllRecording();
+}
+
+function updateSettingsControls() {
+  document.getElementById('chk-transparent').checked = config.transparentBg;
+  document.getElementById('chk-restore-url').checked = config.restoreLastURL;
+  document.getElementById('range-drag-w').value = config.dragAreaPercent.width;
+  document.getElementById('range-drag-h').value = config.dragAreaPercent.height;
+  document.getElementById('val-drag-w').textContent = config.dragAreaPercent.width + '%';
+  document.getElementById('val-drag-h').textContent = config.dragAreaPercent.height + '%';
+  document.getElementById('range-resize-w').value = config.resizeAreaPercent.width;
+  document.getElementById('range-resize-h').value = config.resizeAreaPercent.height;
+  document.getElementById('val-resize-w').textContent = config.resizeAreaPercent.width + '%';
+  document.getElementById('val-resize-h').textContent = config.resizeAreaPercent.height + '%';
+}
+
+async function onTransparentToggle() {
+  config.transparentBg = document.getElementById('chk-transparent').checked;
+  await api.updateConfig({ transparentBg: config.transparentBg });
+  updateTransparentMode();
+  showToast(config.transparentBg ? '透明模式已启用（隐藏控件后生效）' : '透明模式已关闭');
+}
+
+async function onRestoreUrlToggle() {
+  config.restoreLastURL = document.getElementById('chk-restore-url').checked;
+  await api.updateConfig({ restoreLastURL: config.restoreLastURL });
+  showToast(config.restoreLastURL ? '将在下次启动时恢复上次网页' : '启动时将加载主页');
+}
+
+async function onDragAreaChange() {
+  config.dragAreaPercent.width = parseInt(document.getElementById('range-drag-w').value);
+  config.dragAreaPercent.height = parseInt(document.getElementById('range-drag-h').value);
+  document.getElementById('val-drag-w').textContent = config.dragAreaPercent.width + '%';
+  document.getElementById('val-drag-h').textContent = config.dragAreaPercent.height + '%';
+  await api.updateConfig({ dragAreaPercent: config.dragAreaPercent });
+  applyDragResizeZones();
+}
+
+async function onResizeAreaChange() {
+  config.resizeAreaPercent.width = parseInt(document.getElementById('range-resize-w').value);
+  config.resizeAreaPercent.height = parseInt(document.getElementById('range-resize-h').value);
+  document.getElementById('val-resize-w').textContent = config.resizeAreaPercent.width + '%';
+  document.getElementById('val-resize-h').textContent = config.resizeAreaPercent.height + '%';
+  await api.updateConfig({ resizeAreaPercent: config.resizeAreaPercent });
+  applyDragResizeZones();
+}
+
+function applyDragResizeZones() {
+  const dragZone = document.getElementById('drag-zone');
+  const resizeZone = document.getElementById('resize-zone');
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  if (controlsHidden) {
+    // When controls hidden, hide zones too (or not - user's choice)
+    // Let's hide them when controls are hidden
+    dragZone.style.width = '0';
+    dragZone.style.height = '0';
+    dragZone.classList.remove('active');
+    resizeZone.style.width = '0';
+    resizeZone.style.height = '0';
+    resizeZone.classList.remove('active');
+    return;
+  }
+
+  const dragW = Math.round(w * config.dragAreaPercent.width / 100);
+  const dragH = Math.round(h * config.dragAreaPercent.height / 100);
+  const resizeW = Math.round(w * config.resizeAreaPercent.width / 100);
+  const resizeH = Math.round(h * config.resizeAreaPercent.height / 100);
+
+  if (dragW > 0 && dragH > 0) {
+    dragZone.style.width = dragW + 'px';
+    dragZone.style.height = dragH + 'px';
+    dragZone.classList.add('active');
+  } else {
+    dragZone.style.width = '0';
+    dragZone.style.height = '0';
+    dragZone.classList.remove('active');
+  }
+
+  if (resizeW > 0 && resizeH > 0) {
+    resizeZone.style.width = resizeW + 'px';
+    resizeZone.style.height = resizeH + 'px';
+    resizeZone.classList.add('active');
+  } else {
+    resizeZone.style.width = '0';
+    resizeZone.style.height = '0';
+    resizeZone.classList.remove('active');
+  }
+}
+
+// ============================================================
+//  Shortcut Configuration UI
+// ============================================================
+
+let currentRecording = null;
+
+function renderShortcutsList() {
+  const container = document.getElementById('shortcut-list');
+  container.innerHTML = '';
+
+  for (const [actionName, shortcut] of Object.entries(shortcuts)) {
+    const label = shortcutLabels[actionName] || actionName;
+    const comboStr = formatShortcut(shortcut);
+
+    const row = document.createElement('div');
+    row.className = 'shortcut-item';
+    row.innerHTML = `
+      <span class="sc-label">${label}</span>
+      <span class="sc-combo" id="sc-${actionName}" data-action="${actionName}">${comboStr}</span>
+      <button class="sc-reset" title="Reset" data-action="${actionName}">&#x21BA;</button>
+    `;
+    container.appendChild(row);
+
+    // Click to start recording
+    row.querySelector('.sc-combo').addEventListener('click', (e) => {
+      startRecording(actionName, e.target);
+    });
+
+    // Reset button
+    row.querySelector('.sc-reset').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const name = e.target.dataset.action;
+      const defaults = {
+        closeWindow:       { type: 'keyboard', key: 'F4',    ctrl: false, alt: true,  shift: false, meta: false, buttons: 0 },
+        toggleDarkMode:    { type: 'keyboard', key: 'D',     ctrl: true,  alt: false, shift: false, meta: false, buttons: 0 },
+        hideControls:      { type: 'keyboard', key: 'F11',   ctrl: false, alt: false, shift: false, meta: false, buttons: 0 },
+        toggleAlwaysOnTop: { type: 'keyboard', key: 'T',     ctrl: true,  alt: false, shift: true,  meta: false, buttons: 0 },
+      };
+      shortcuts[name] = defaults[name];
+      await api.updateShortcut(name, shortcuts[name]);
+      renderShortcutsList();
+      showToast('快捷键已重置为默认');
+    });
+  }
+}
+
+function formatShortcut(shortcut) {
+  if (!shortcut) return '无';
+
+  if (shortcut.type === 'keyboard') {
+    const parts = [];
+    if (shortcut.ctrl) parts.push('Ctrl');
+    if (shortcut.alt) parts.push('Alt');
+    if (shortcut.shift) parts.push('Shift');
+    if (shortcut.meta) parts.push('Win');
+    if (shortcut.key) parts.push(shortcut.key);
+    return parts.join(' + ') || '无';
+  }
+
+  if (shortcut.type === 'mouse' || shortcut.buttons) {
+    const parts = [];
+    if (shortcut.ctrl) parts.push('Ctrl');
+    if (shortcut.alt) parts.push('Alt');
+    if (shortcut.shift) parts.push('Shift');
+    if (shortcut.meta) parts.push('Win');
+    // Mouse buttons
+    const btnNames = [];
+    if (shortcut.buttons & 1) btnNames.push('左键');
+    if (shortcut.buttons & 2) btnNames.push('右键');
+    if (shortcut.buttons & 4) btnNames.push('中键');
+    parts.push(btnNames.join('+') || '点击');
+    return parts.join(' + ');
+  }
+
+  return '无';
+}
+
+function startRecording(actionName, element) {
+  // Stop any existing recording
+  stopAllRecording();
+  currentRecording = { actionName, element };
+  element.classList.add('recording');
+  element.textContent = '按下快捷键 / 点击鼠标...';
+  showToast('正在录制快捷键... 按 Esc 取消');
+}
+
+function stopAllRecording() {
+  if (currentRecording) {
+    currentRecording.element.classList.remove('recording');
+    currentRecording.element.textContent = formatShortcut(shortcuts[currentRecording.actionName]);
+    currentRecording = null;
+  }
+}
+
+// ============================================================
+//  Mouse & Keyboard Shortcut Detection (in toolbar area)
+// ============================================================
+
+// Track mouse button state
+let mouseButtonsDown = 0;
+
+document.addEventListener('keydown', async (e) => {
+  if (currentRecording) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === 'Escape') {
+      stopAllRecording();
+      showToast('录制已取消');
+      return;
+    }
+    if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
+
+    const shortcut = {
+      type: 'keyboard',
+      key: e.key.length === 1 ? e.key.toUpperCase() : e.key,
+      ctrl: e.ctrlKey,
+      alt: e.altKey,
+      shift: e.shiftKey,
+      meta: e.metaKey,
+      buttons: 0,
+    };
+    shortcuts[currentRecording.actionName] = shortcut;
+    await api.updateShortcut(currentRecording.actionName, shortcut);
+    const name = currentRecording.actionName;
+    currentRecording.element.classList.remove('recording');
+    currentRecording.element.textContent = formatShortcut(shortcut);
+    currentRecording = null;
+    showToast(`快捷键已设置: ${formatShortcut(shortcut)}`);
+    return;
+  }
+
+  // If not recording, check for configured mouse shorcuts (keyboard already handled by globalShortcut in main)
+});
+
+document.addEventListener('keyup', (e) => {
+  // Handled above
+});
+
+document.addEventListener('mousedown', async (e) => {
+  // Track button states for combo detection
+  mouseButtonsDown |= (1 << (e.button));
+
+  // Ignore events on webview for mouse shortcuts
+  if (isOnWebview(e.target)) {
+    return;
+  }
+
+  if (currentRecording) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Small delay to allow multi-button detection
+    await sleep(100);
+
+    const shortcut = {
+      type: 'mouse',
+      key: '',
+      ctrl: e.ctrlKey,
+      alt: e.altKey,
+      shift: e.shiftKey,
+      meta: e.metaKey,
+      buttons: mouseButtonsDown,
+    };
+    shortcuts[currentRecording.actionName] = shortcut;
+    await api.updateShortcut(currentRecording.actionName, shortcut);
+    currentRecording.element.classList.remove('recording');
+    currentRecording.element.textContent = formatShortcut(shortcut);
+    currentRecording = null;
+    showToast(`快捷键已设置: ${formatShortcut(shortcut)}`);
+    return;
+  }
+
+  // Check for configured mouse shortcuts (only in toolbar area)
+  if (!currentRecording && !controlsHidden) {
+    // Small delay for multi-button detection
+    await sleep(80);
+    checkMouseShortcuts(mouseButtonsDown, e.ctrlKey, e.altKey, e.shiftKey, e.metaKey);
+  }
+});
+
+document.addEventListener('mouseup', (e) => {
+  mouseButtonsDown &= ~(1 << (e.button));
+});
+
+document.addEventListener('contextmenu', (e) => {
+  // Ignore right-click in toolbar area for shortcut recording
+  if (currentRecording) {
+    e.preventDefault();
+  }
+  // Check if we should suppress for a configured right-click shortcut in toolbar
+  if (!controlsHidden && !isOnWebview(e.target)) {
+    if (shortcuts && Object.values(shortcuts).some(s => s.buttons & 2)) {
+      // There's a configured shortcut using right-click; check if it matches
+      // We'll let the mousedown handler check
+    }
+  }
+});
+
+// Clean up mouse button state when window loses focus
+window.addEventListener('blur', () => { mouseButtonsDown = 0; });
+
+function isOnWebview(target) {
+  return target === webview ||
+    webview.contains(target) &&
+    !target.closest('#toolbar') &&
+    !target.closest('#titlebar') &&
+    !target.closest('#settings-dropdown') &&
+    !target.closest('#bookmark-dropdown') &&
+    !target.closest('#drag-zone') &&
+    !target.closest('#resize-zone');
+}
+
+function checkMouseShortcuts(buttons, ctrlKey, altKey, shiftKey, metaKey) {
+  if (!shortcuts) return;
+  for (const [actionName, sc] of Object.entries(shortcuts)) {
+    if (!sc || sc.type !== 'mouse' || sc.buttons === 0) continue;
+    if (sc.buttons !== buttons) continue;
+    if ((sc.ctrl || false) !== ctrlKey) continue;
+    if ((sc.alt || false) !== altKey) continue;
+    if ((sc.shift || false) !== shiftKey) continue;
+    if ((sc.meta || false) !== metaKey) continue;
+
+    // Execute the action
+    executeAction(actionName);
+    return;
+  }
+}
+
+function executeAction(actionName) {
+  if (currentRecording) return;
+  switch (actionName) {
+    case 'closeWindow': api.closeWindow(); break;
+    case 'toggleDarkMode': api.toggleDarkMode(); break;
+    case 'hideControls': api.toggleControlsHidden(); break;
+    case 'toggleAlwaysOnTop': api.toggleAlwaysOnTop(); break;
+  }
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ============================================================
+//  Drag Zone (window move via CSS -webkit-app-region)
+// ============================================================
+
+// Drag is handled by CSS -webkit-app-region: drag on the drag-zone div.
+// We just need to update the zone size.
+
+// ============================================================
+//  Resize Zone (manual window resize)
+// ============================================================
+
+let isResizing = false;
+let resizeStartX = 0, resizeStartY = 0;
+let resizeStartW = 0, resizeStartH = 0;
+
+document.getElementById('resize-zone').addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return; // Left button only
+  isResizing = true;
+  resizeStartX = e.screenX;
+  resizeStartY = e.screenY;
+  resizeStartW = window.innerWidth;
+  resizeStartH = window.innerHeight;
+  e.preventDefault();
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (!isResizing) return;
+  const dx = e.screenX - resizeStartX;
+  const dy = e.screenY - resizeStartY;
+  const newW = Math.max(400, resizeStartW + dx);
+  const newH = Math.max(300, resizeStartH + dy);
+  api.resizeWindow({ width: newW, height: newH });
+});
+
+document.addEventListener('mouseup', () => {
+  isResizing = false;
+});
+
+// ============================================================
+//  Window Resize Handler (update zones)
+// ============================================================
+
+window.addEventListener('resize', () => {
+  applyDragResizeZones();
+});
+
+// ============================================================
+//  URL Bar Enter Key
+// ============================================================
+
+document.getElementById('url-bar').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    navigateToUrl();
+  }
+});
+
+// ============================================================
+//  Toast
+// ============================================================
+
+let toastTimer;
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+// ============================================================
+//  Utilities
+// ============================================================
+
+function escapeHTML(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function escapeAttr(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// ============================================================
+//  Start
+// ============================================================
+
+init();
+</script>
+</body>
+</html>
