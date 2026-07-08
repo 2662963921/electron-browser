@@ -2,6 +2,16 @@
 //  Electron WebView Browser - Main Process
 // ============================================================
 
+// Guard: if ELECTRON_RUN_AS_NODE is set, Electron won't work properly
+if (process.env.ELECTRON_RUN_AS_NODE) {
+  console.error(
+    'ELECTRON_RUN_AS_NODE is set! This breaks Electron startup.\n' +
+    'Please use:  node start.js .   or   start.bat\n' +
+    '(WorkBuddy sets this env var system-wide)'
+  );
+  process.exit(1);
+}
+
 const {
   app,
   BrowserWindow,

@@ -4,7 +4,7 @@
   "description": "Windows Electron WebView Browser with advanced controls",
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
+    "start": "node start.js .",
     "build": "electron-builder --win portable",
     "build:installer": "electron-builder --win"
   },
