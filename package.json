@@ -6,8 +6,7 @@
   "main": "main.js",
   "scripts": {
     "start": "node start.js .",
-    "build": "electron-builder --win portable",
-    "build:installer": "electron-builder --win"
+    "build": "electron-builder --win portable"
   },
   "build": {
     "appId": "com.electron.browser",
@@ -16,10 +15,7 @@
       "output": "dist"
     },
     "win": {
-      "target": [
-        "portable",
-        "nsis"
-      ],
+      "target": ["portable"],
       "icon": null,
       "requestedExecutionLevel": "asInvoker"
     },
@@ -27,14 +23,8 @@
       "main.js",
       "preload.js",
       "index.html",
-      "error.html",
-      "start.js",
-      "start.bat"
-    ],
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
-    }
+      "error.html"
+    ]
   },
   "devDependencies": {
     "electron": "^28.0.0",
