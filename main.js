@@ -39,7 +39,7 @@ const fs = require('fs');
 
 const defaultConfig = {
   darkMode: false,
-  homepage: 'about:blank',
+  homepage: 'https://www.bing.com',
   lastURL: '',
   restoreLastURL: true,
   bookmarks: [],

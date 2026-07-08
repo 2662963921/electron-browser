@@ -10,20 +10,27 @@
   },
   "build": {
     "appId": "com.electron.browser",
-    "productName": "WebView Browser",
+    "productName": "WebView 浏览器",
     "directories": {
       "output": "dist"
     },
     "win": {
       "target": ["portable", "nsis"],
-      "icon": null
+      "icon": null,
+      "requestedExecutionLevel": "asInvoker"
     },
     "files": [
       "main.js",
       "preload.js",
       "index.html",
-      "error.html"
-    ]
+      "error.html",
+      "start.js",
+      "start.bat"
+    ],
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   },
   "devDependencies": {
     "electron": "^28.0.0"

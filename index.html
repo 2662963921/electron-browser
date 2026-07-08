@@ -724,8 +724,8 @@ async function init() {
   // Restore last URL if configured
   if (config.restoreLastURL && config.lastURL && config.lastURL !== 'about:blank') {
     navigateTo(config.lastURL);
-  } else if (config.homepage && config.homepage !== 'about:blank') {
-    document.getElementById('url-bar').value = config.homepage;
+  } else if (config.homepage && config.homepage !== 'about:blank' && currentURL === 'about:blank') {
+    navigateTo(config.homepage);
   }
 }
 
@@ -753,6 +753,7 @@ async function applyConfig() {
 
 function applyTheme() {
   document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+  syncWebviewTheme();
 }
 
 async function applyControlsHidden() {
@@ -778,22 +779,56 @@ function updateTransparentMode() {
   }
 }
 
+let transparentCSSKey = null;
+let darkModeCSSKey = null;
+
 function injectWebviewTransparentCSS() {
+  removeWebviewTransparentCSS();
   try {
-    webview.insertCSS('html, body { background: transparent !important; } ::-webkit-scrollbar { display: none !important; }');
+    webview.insertCSS('html, body { background: transparent !important; } ::-webkit-scrollbar { display: none !important; }')
+      .then(key => { transparentCSSKey = key; })
+      .catch(() => {});
   } catch (_) {}
 }
 
 function removeWebviewTransparentCSS() {
+  if (transparentCSSKey) {
+    try { webview.removeInsertedCSS(transparentCSSKey); } catch (_) {}
+    transparentCSSKey = null;
+  }
+}
+
+function injectWebviewDarkCSS() {
+  removeWebviewDarkCSS();
   try {
-    webview.insertCSS('html, body { background: initial; } ::-webkit-scrollbar { display: initial; }');
+    webview.insertCSS(`
+      html { filter: invert(0.9) hue-rotate(180deg) !important; }
+      img, video, canvas, [style*="background-image"], iframe {
+        filter: invert(1) hue-rotate(180deg) !important;
+      }
+    `).then(key => { darkModeCSSKey = key; }).catch(() => {});
   } catch (_) {}
+}
+
+function removeWebviewDarkCSS() {
+  if (darkModeCSSKey) {
+    try { webview.removeInsertedCSS(darkModeCSSKey); } catch (_) {}
+    darkModeCSSKey = null;
+  }
 }
 
 function injectHideScrollbarCSS() {
   try {
-    webview.insertCSS('::-webkit-scrollbar { display: none !important; }');
+    webview.insertCSS('::-webkit-scrollbar { display: none !important; }').catch(() => {});
   } catch (_) {}
+}
+
+function syncWebviewTheme() {
+  if (darkMode) {
+    injectWebviewDarkCSS();
+  } else {
+    removeWebviewDarkCSS();
+  }
 }
 
 async function updateMaxBtn(maximized) {
@@ -990,12 +1025,11 @@ function updateNavButtons() {
 }
 
 // Save last navigated URL for restore
-let lastURLSaveTimer = null;
 function saveLastURL(url) {
   if (!url || url === 'about:blank' || url.startsWith('data:')) return;
   config.lastURL = url;
-  if (lastURLSaveTimer) clearTimeout(lastURLSaveTimer);
-  lastURLSaveTimer = setTimeout(() => api.updateConfig({ lastURL: url }), 1000);
+  // Save immediately (no debounce) so it persists even if app closes
+  api.updateConfig({ lastURL: url });
 }
 
 // ============================================================
@@ -1153,24 +1187,23 @@ function applyDragResizeZones() {
   const w = window.innerWidth;
   const h = window.innerHeight;
 
-  if (controlsHidden) {
-    // When controls hidden, hide zones too (or not - user's choice)
-    // Let's hide them when controls are hidden
-    dragZone.style.width = '0';
-    dragZone.style.height = '0';
-    dragZone.classList.remove('active');
-    resizeZone.style.width = '0';
-    resizeZone.style.height = '0';
-    resizeZone.classList.remove('active');
-    return;
-  }
+  // Drag zone: always at top of the visible area (titlebar when shown, webview top when hidden)
+  // Resize zone: always at bottom-right corner of the window
+  const dragAreaPct = controlsHidden
+    ? { width: config.dragAreaPercent.width || 15, height: config.dragAreaPercent.height || 8 }
+    : config.dragAreaPercent;
+  const resizeAreaPct = controlsHidden
+    ? { width: config.resizeAreaPercent.width || 8, height: config.resizeAreaPercent.height || 8 }
+    : config.resizeAreaPercent;
 
-  const dragW = Math.round(w * config.dragAreaPercent.width / 100);
-  const dragH = Math.round(h * config.dragAreaPercent.height / 100);
-  const resizeW = Math.round(w * config.resizeAreaPercent.width / 100);
-  const resizeH = Math.round(h * config.resizeAreaPercent.height / 100);
+  const dragW = Math.round(w * dragAreaPct.width / 100);
+  const dragH = Math.round(h * dragAreaPct.height / 100);
+  const resizeW = Math.round(w * resizeAreaPct.width / 100);
+  const resizeH = Math.round(h * resizeAreaPct.height / 100);
 
   if (dragW > 0 && dragH > 0) {
+    dragZone.style.top = '0';
+    dragZone.style.left = '0';
     dragZone.style.width = dragW + 'px';
     dragZone.style.height = dragH + 'px';
     dragZone.classList.add('active');
@@ -1181,6 +1214,8 @@ function applyDragResizeZones() {
   }
 
   if (resizeW > 0 && resizeH > 0) {
+    resizeZone.style.bottom = '0';
+    resizeZone.style.right = '0';
     resizeZone.style.width = resizeW + 'px';
     resizeZone.style.height = resizeH + 'px';
     resizeZone.classList.add('active');
@@ -1519,6 +1554,13 @@ function escapeAttr(str) {
 // ============================================================
 
 init();
+
+// Save last URL immediately before window closes
+window.addEventListener('beforeunload', () => {
+  if (currentURL && currentURL !== 'about:blank' && !currentURL.startsWith('data:')) {
+    api.updateConfig({ lastURL: currentURL });
+  }
+});
 </script>
 </body>
 </html>
