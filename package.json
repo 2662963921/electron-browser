@@ -6,7 +6,8 @@
   "main": "main.js",
   "scripts": {
     "start": "node start.js .",
-    "build": "set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ && set ELECTRON_CACHE=%USERPROFILE%\\.electron-cache && electron-builder --win portable"
+    "build": "set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ && set ELECTRON_CACHE=%USERPROFILE%\\.electron-cache && electron-builder --win portable",
+    "build:fast": "electron-builder --win portable --prepackaged=dist/win-unpacked --config.win.target=portable"
   },
   "build": {
     "appId": "com.electron.browser",
