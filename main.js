@@ -12,6 +12,17 @@ if (process.env.ELECTRON_RUN_AS_NODE) {
   process.exit(1);
 }
 
+// Suppress webview internal navigation errors (e.g. ERR_CONNECTION_TIMED_OUT)
+// These show as "Error occurred in handler for 'GUEST_VIEW_MANAGER_CALL'"
+// but are already handled gracefully by the renderer's did-fail-load handler.
+process.on('unhandledRejection', (reason) => {
+  const msg = String(reason);
+  if (msg.includes('GUEST_VIEW_MANAGER_CALL') || msg.includes('ERR_CONNECTION')) {
+    return; // silently ignore — handled in renderer
+  }
+  console.error('Unhandled Rejection:', reason);
+});
+
 const {
   app,
   BrowserWindow,
