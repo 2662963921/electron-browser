@@ -60,7 +60,12 @@ const defaultConfig = {
 let config = { ...defaultConfig };
 
 function getConfigPath() {
-  return path.join(__dirname, 'config.json');
+  // Packaged exe → config.json next to the exe file
+  // Development → config.json in project root
+  const dir = app.isPackaged
+    ? path.dirname(app.getPath('exe'))
+    : __dirname;
+  return path.join(dir, 'config.json');
 }
 
 function loadConfig() {
