@@ -475,12 +475,18 @@ app.on('web-contents-created', (_event, contents) => {
   contents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown') return;
     const key = input.key;
-    // F12 → 工具箱 (app shell DevTools)
+    // F12 → toggle 工具箱 (app shell DevTools)
     if (key === 'F12') {
       event.preventDefault();
       if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
-        try { mainWindow.webContents.openDevTools(); } catch (_) {}
-        try { mainWindow.webContents.send('devtools-opened', 'shell'); } catch (_) {}
+        try {
+          if (mainWindow.webContents.isDevToolsOpened()) {
+            mainWindow.webContents.closeDevTools();
+          } else {
+            mainWindow.webContents.openDevTools();
+            mainWindow.webContents.send('devtools-opened', 'shell');
+          }
+        } catch (_) {}
       }
       return;
     }

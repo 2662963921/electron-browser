@@ -996,6 +996,17 @@ function injectSideButtonHandler() {
             history.forward();
           }
         }, true);
+        // Shift+Space → scroll up (Electron webview sometimes doesn't forward
+        // the Shift modifier for Space, so the default scroll-up doesn't fire.
+        // We handle it manually, skipping input/textarea/contenteditable.)
+        document.addEventListener('keydown', function(e) {
+          if (e.key === ' ' && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+            var tag = (e.target && e.target.tagName || '').toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable)) return;
+            e.preventDefault();
+            window.scrollBy(0, -window.innerHeight * 0.85);
+          }
+        }, true);
       })();
     `);
   } catch (_) {}
@@ -1123,6 +1134,12 @@ function setupWebview() {
   });
 
   webview.addEventListener('did-navigate', (e) => {
+    // Don't let data: URLs (error pages) show in the address bar — keep the
+    // URL the user was trying to visit visible (same as Chrome's error pages).
+    if (e.url && e.url.startsWith('data:')) {
+      updateNavButtons();
+      return;
+    }
     currentURL = e.url;
     document.getElementById('url-bar').value = currentURL;
     updateNavButtons();
@@ -1141,6 +1158,7 @@ function setupWebview() {
 
   webview.addEventListener('did-navigate-in-page', (e) => {
     if (e.isMainFrame) {
+      if (e.url && e.url.startsWith('data:')) return;
       currentURL = e.url;
       document.getElementById('url-bar').value = currentURL;
       updateNavButtons();
@@ -1503,6 +1521,10 @@ function applyDragResizeZones() {
 // ============================================================
 
 let currentRecording = null;
+// Combination mouse-shortcut recording state
+let recordingButtons = 0;        // accumulated bitmask of pressed buttons
+let recordingTimer = null;       // timeout to auto-finish if no more buttons
+let recordingModifiers = null;   // {ctrl,alt,shift,meta} from last mousedown
 
 function renderShortcutsList() {
   const container = document.getElementById('shortcut-list');
@@ -1568,6 +1590,8 @@ function formatShortcut(shortcut) {
     if (shortcut.buttons & 1) btnNames.push('左键');
     if (shortcut.buttons & 2) btnNames.push('右键');
     if (shortcut.buttons & 4) btnNames.push('中键');
+    if (shortcut.buttons & 8) btnNames.push('侧键后退');
+    if (shortcut.buttons & 16) btnNames.push('侧键前进');
     parts.push(btnNames.join('+') || '点击');
     return parts.join(' + ');
   }
@@ -1580,16 +1604,45 @@ function startRecording(actionName, element) {
   stopAllRecording();
   currentRecording = { actionName, element };
   element.classList.add('recording');
-  element.textContent = '按下快捷键 / 点击鼠标...';
-  showToast('正在录制快捷键... 按 Esc 取消');
+  element.textContent = '按下按键 / 点击鼠标（可组合）...';
+  showToast('正在录制快捷键... 可同时按多个鼠标键组合，按 Esc 取消');
 }
 
 function stopAllRecording() {
+  if (recordingTimer) { clearTimeout(recordingTimer); recordingTimer = null; }
+  recordingButtons = 0;
+  recordingModifiers = null;
   if (currentRecording) {
     currentRecording.element.classList.remove('recording');
     currentRecording.element.textContent = formatShortcut(shortcuts[currentRecording.actionName]);
     currentRecording = null;
   }
+}
+
+// Finish recording a mouse shortcut after the user releases all buttons
+// (or after a 400ms idle timeout). Supports single buttons AND combinations
+// like middle+left, middle+right, middle+side, etc.
+async function finishMouseRecording() {
+  if (!currentRecording || recordingButtons === 0) return;
+  if (recordingTimer) { clearTimeout(recordingTimer); recordingTimer = null; }
+  const m = recordingModifiers || { ctrl: false, alt: false, shift: false, meta: false };
+  const shortcut = {
+    type: 'mouse',
+    key: '',
+    ctrl: m.ctrl,
+    alt: m.alt,
+    shift: m.shift,
+    meta: m.meta,
+    buttons: recordingButtons,
+  };
+  shortcuts[currentRecording.actionName] = shortcut;
+  await api.updateShortcut(currentRecording.actionName, shortcut);
+  currentRecording.element.classList.remove('recording');
+  currentRecording.element.textContent = formatShortcut(shortcut);
+  currentRecording = null;
+  recordingButtons = 0;
+  recordingModifiers = null;
+  showToast(`快捷键已设置: ${formatShortcut(shortcut)}`);
 }
 
 // ============================================================
@@ -1637,7 +1690,38 @@ document.addEventListener('keyup', (e) => {
 });
 
 document.addEventListener('mousedown', async (e) => {
-  // Mouse side buttons: XButton1 (button 3) → Back, XButton2 (button 4) → Forward
+  // Track button states using the STANDARD MouseEvent.buttons bitmask
+  // (1 = left, 2 = right, 4 = middle, 8 = back, 16 = forward)
+  mouseButtonsDown |= e.buttons;
+
+  // --- Recording mode (supports combinations) ---
+  if (currentRecording) {
+    // Only record clicks that land on the app shell (not inside the webview)
+    if (isOnWebview(e.target)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    // Accumulate buttons — don't finish yet, wait for more buttons or release
+    recordingButtons |= e.buttons;
+    recordingModifiers = { ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey };
+    if (recordingTimer) clearTimeout(recordingTimer);
+    // Auto-finish after 400ms of no new button presses
+    recordingTimer = setTimeout(finishMouseRecording, 400);
+    return;
+  }
+
+  // --- Trigger configured mouse shortcuts (includes combinations) ---
+  // Runs BEFORE the webview guard so a shortcut bound to a mouse button still
+  // fires when controls are hidden and even when the click lands on the webview.
+  const matched = checkMouseShortcuts(e.buttons, e.ctrlKey, e.altKey, e.shiftKey, e.metaKey);
+  if (matched) {
+    e.preventDefault();
+    e.stopPropagation();
+    return;
+  }
+
+  // --- Default side button behavior (back/forward) as fallback ---
+  // Only fires if no configured shortcut matched, so combinations with side
+  // buttons take priority over the default back/forward.
   if (e.button === 3) {
     e.preventDefault();
     goBack();
@@ -1649,67 +1733,33 @@ document.addEventListener('mousedown', async (e) => {
     return;
   }
 
-  // Track button states using the STANDARD MouseEvent.buttons bitmask
-  // (1 = left, 2 = right, 4 = middle) so it matches both formatShortcut's
-  // decoding and the recorded shortcut value.
-  mouseButtonsDown |= e.buttons;
-
-  // --- Recording mode ---
-  if (currentRecording) {
-    // Only record clicks that land on the app shell (not inside the webview)
-    if (isOnWebview(e.target)) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const shortcut = {
-      type: 'mouse',
-      key: '',
-      ctrl: e.ctrlKey,
-      alt: e.altKey,
-      shift: e.shiftKey,
-      meta: e.metaKey,
-      buttons: e.buttons,   // standard bitmask → decoded correctly by formatShortcut
-    };
-    shortcuts[currentRecording.actionName] = shortcut;
-    await api.updateShortcut(currentRecording.actionName, shortcut);
-    currentRecording.element.classList.remove('recording');
-    currentRecording.element.textContent = formatShortcut(shortcut);
-    currentRecording = null;
-    showToast(`快捷键已设置: ${formatShortcut(shortcut)}`);
-    return;
-  }
-
-  // --- Trigger configured mouse shortcuts ---
-  // Runs BEFORE the webview guard so a shortcut bound to a mouse button still
-  // fires when controls are hidden (the previous `!controlsHidden` guard
-  // disabled it, making the border impossible to restore) and even when the
-  // click lands on the webview. Only a MATCHED shortcut blocks the page
-  // (preventDefault); unmatched clicks fall through so the web page keeps
-  // working normally.
-  const matched = checkMouseShortcuts(e.buttons, e.ctrlKey, e.altKey, e.shiftKey, e.metaKey);
-  if (matched) {
-    e.preventDefault();
-    e.stopPropagation();
-    return;
-  }
-
   // Unmatched click on the webview → let the page handle it
   if (isOnWebview(e.target)) return;
 });
 
 document.addEventListener('mouseup', (e) => {
   mouseButtonsDown &= ~e.buttons;
+  // If recording and all buttons released, finish immediately
+  if (currentRecording && recordingButtons > 0) {
+    // e.buttons on mouseup = state AFTER release; 0 means all released
+    if (e.buttons === 0 || (recordingButtons & e.buttons) === 0) {
+      if (recordingTimer) clearTimeout(recordingTimer);
+      finishMouseRecording();
+    }
+  }
 });
 
 document.addEventListener('contextmenu', (e) => {
-  // Ignore right-click in toolbar area for shortcut recording
+  // Suppress context menu during recording
   if (currentRecording) {
     e.preventDefault();
+    return;
   }
-  // Check if we should suppress for a configured right-click shortcut in toolbar
-  if (!controlsHidden && !isOnWebview(e.target)) {
-    if (shortcuts && Object.values(shortcuts).some(s => s.buttons & 2)) {
-      // There's a configured shortcut using right-click; check if it matches
-      // We'll let the mousedown handler check
+  // If any configured mouse shortcut uses right-click (bit 2), suppress the
+  // context menu in the toolbar area so the shortcut can fire cleanly.
+  if (!isOnWebview(e.target)) {
+    if (shortcuts && Object.values(shortcuts).some(s => s && s.type === 'mouse' && (s.buttons & 2))) {
+      e.preventDefault();
     }
   }
 });
