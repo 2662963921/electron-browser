@@ -626,7 +626,6 @@ body.transparent-mode #webview-container {
     <!-- WebView Container -->
     <div id="webview-container">
       <webview id="main-webview"
-        src="about:blank"
         allowpopups="false"
         nodeintegration="false"
         webpreferences="contextIsolation=true"
@@ -729,24 +728,9 @@ async function init() {
       : 'https://www.bing.com';
   console.log('Initial target:', initialTarget);
 
-  // Guard: if webview is still on about:blank after first load, navigate then too
-  let initialNavDone = false;
-  webview.addEventListener('did-finish-load', function initialNavGuard() {
-    if (initialNavDone) return;
-    initialNavDone = true;
-    try {
-      if (webview.getURL() === 'about:blank') {
-        console.log('Initial nav guard: navigating to', initialTarget);
-        navigateTo(initialTarget);
-      }
-    } catch (_) {
-      navigateTo(initialTarget);
-    }
-  }, { once: true });
-
-  // Navigate immediately — the webview element already exists in DOM
-  // loadURL() queues the navigation internally even if about:blank hasn't finished
-  navigateTo(initialTarget);
+  // Navigate immediately. Webview starts with no src, so this is a clean first navigation.
+  // Use setTimeout(0) to yield one tick so the webview element is fully attached.
+  setTimeout(() => navigateTo(initialTarget), 0);
 }
 
 async function applyConfig() {
@@ -1062,20 +1046,8 @@ function navigateTo(rawUrl) {
   }
 
   document.getElementById('url-bar').value = url;
-  // Use loadURL first, fall back to setting src attribute directly
-  try {
-    webview.loadURL(url);
-  } catch (_) {
-    webview.src = url;
-  }
-  // Verify navigation worked; if still on about:blank, set src as fallback
-  setTimeout(() => {
-    try {
-      if (webview.getURL() === 'about:blank' && url !== 'about:blank') {
-        webview.src = url;
-      }
-    } catch (_) {}
-  }, 100);
+  // Set src directly — most reliable navigation method
+  webview.src = url;
 }
 
 function updateNavButtons() {
