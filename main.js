@@ -128,6 +128,10 @@ function createWindow() {
 
   mainWindow.loadFile('index.html');
 
+  if (config.isMaximized) {
+    mainWindow.maximize();
+  }
+
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     if (config.alwaysOnTop) {
@@ -493,10 +497,16 @@ app.on('web-contents-created', (_event, contents) => {
 
 // Save last URL when app closes
 app.on('before-quit', () => {
+  // Persist window geometry so size/position/maximized state restore on next launch
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    const b = mainWindow.getBounds();
+    config.windowBounds = { x: b.x, y: b.y, width: b.width, height: b.height };
+    config.isMaximized = mainWindow.isMaximized();
+  }
   if (trackedLastURL) {
     config.lastURL = trackedLastURL;
-    saveConfig(config);
   }
+  saveConfig(config);
   cleanupWebviewProcesses();
   globalShortcut.unregisterAll();
 });

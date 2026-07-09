@@ -152,13 +152,15 @@ html, body {
   color: var(--text-secondary);
   font-size: 16px;
   border-radius: var(--radius-sm);
-  transition: all var(--transition-fast);
+  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
   flex-shrink: 0;
+  outline: none;
 }
-.tool-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
-.tool-btn:active { transform: scale(0.95); }
+.tool-btn:hover { background: var(--accent-light); color: var(--accent); }
+.tool-btn:active { transform: scale(0.9); background: var(--accent-light); color: var(--accent); }
+.tool-btn:focus-visible { box-shadow: 0 0 0 2px var(--accent); }
 .tool-btn:disabled { opacity: 0.35; cursor: default; }
-.tool-btn:disabled:hover { background: transparent; }
+.tool-btn:disabled:hover { background: transparent; color: var(--text-secondary); }
 .tool-btn.active { color: var(--accent); background: var(--accent-light); }
 
 .tool-sep {
@@ -301,14 +303,14 @@ html, body {
 /* Shortcut Item */
 .shortcut-item {
   display: flex; align-items: center;
-  justify-content: space-between;
-  padding: 6px 0;
-  gap: 10px;
+  padding: 7px 2px;
+  gap: 12px;
 }
 .shortcut-item .sc-label {
   font-size: 13px;
   color: var(--text-primary);
-  flex-shrink: 0;
+  flex: 1;
+  min-width: 0;
 }
 .shortcut-item .sc-combo {
   font-size: 12px;
@@ -357,16 +359,51 @@ html, body {
   color: var(--text-primary);
 }
 .setting-row input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none;
   width: 18px; height: 18px;
-  accent-color: var(--accent);
+  border: 2px solid var(--border-color);
+  border-radius: 5px;
+  background: var(--bg-input);
   cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+.setting-row input[type="checkbox"]:hover { border-color: var(--accent); }
+.setting-row input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
+.setting-row input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px; top: 1px;
+  width: 4px; height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
 }
 .range-group {
   display: flex; align-items: center; gap: 8px;
 }
 .range-group input[type="range"] {
-  width: 100px;
-  accent-color: var(--accent);
+  -webkit-appearance: none; appearance: none;
+  width: 110px; height: 4px;
+  background: var(--border-color);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.range-group input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg-dropdown);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+.range-group input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg-dropdown);
   cursor: pointer;
 }
 .range-group .range-val {
@@ -832,9 +869,24 @@ let transparentCSSKey = null;
 function injectWebviewTransparentCSS() {
   removeWebviewTransparentCSS();
   try {
-    // Make EVERY element fully transparent, including background images, so the
-    // desktop shows through even when a page sets a background-image.
-    webview.insertCSS('* { background-color: transparent !important; background-image: none !important; } ::-webkit-scrollbar { display: none !important; }')
+    // Strip EVERY background (color, image, gradient) from all elements so only
+    // the foreground text/content remains and the desktop shows through.
+    // Also hide visual media elements: many sites (e.g. Bing's daily background)
+    // paint their "background image" using a real <img> element, which is NOT
+    // covered by `background-image: none` — so we explicitly hide img/picture/
+    // video/canvas to stop them from blocking the transparency.
+    const css = `
+      *, *::before, *::after, :root, html, body {
+        background: transparent !important;
+        background-color: transparent !important;
+        background-image: none !important;
+      }
+      img, picture, video, canvas {
+        visibility: hidden !important;
+      }
+      ::-webkit-scrollbar { display: none !important; }
+    `;
+    webview.insertCSS(css)
       .then(key => { transparentCSSKey = key; })
       .catch(() => {});
   } catch (_) {}
@@ -1518,21 +1570,17 @@ document.addEventListener('mousedown', async (e) => {
     return;
   }
 
-  // Track button states for combo detection
-  mouseButtonsDown |= (1 << (e.button));
+  // Track button states using the STANDARD MouseEvent.buttons bitmask
+  // (1 = left, 2 = right, 4 = middle) so it matches both formatShortcut's
+  // decoding and the recorded shortcut value.
+  mouseButtonsDown |= e.buttons;
 
-  // Ignore events on webview for mouse shortcuts
-  if (isOnWebview(e.target)) {
-    return;
-  }
-
+  // --- Recording mode ---
   if (currentRecording) {
+    // Only record clicks that land on the app shell (not inside the webview)
+    if (isOnWebview(e.target)) return;
     e.preventDefault();
     e.stopPropagation();
-
-    // Small delay to allow multi-button detection
-    await sleep(100);
-
     const shortcut = {
       type: 'mouse',
       key: '',
@@ -1540,7 +1588,7 @@ document.addEventListener('mousedown', async (e) => {
       alt: e.altKey,
       shift: e.shiftKey,
       meta: e.metaKey,
-      buttons: mouseButtonsDown,
+      buttons: e.buttons,   // standard bitmask → decoded correctly by formatShortcut
     };
     shortcuts[currentRecording.actionName] = shortcut;
     await api.updateShortcut(currentRecording.actionName, shortcut);
@@ -1551,16 +1599,26 @@ document.addEventListener('mousedown', async (e) => {
     return;
   }
 
-  // Check for configured mouse shortcuts (only in toolbar area)
-  if (!currentRecording && !controlsHidden) {
-    // Small delay for multi-button detection
-    await sleep(80);
-    checkMouseShortcuts(mouseButtonsDown, e.ctrlKey, e.altKey, e.shiftKey, e.metaKey);
+  // --- Trigger configured mouse shortcuts ---
+  // Runs BEFORE the webview guard so a shortcut bound to a mouse button still
+  // fires when controls are hidden (the previous `!controlsHidden` guard
+  // disabled it, making the border impossible to restore) and even when the
+  // click lands on the webview. Only a MATCHED shortcut blocks the page
+  // (preventDefault); unmatched clicks fall through so the web page keeps
+  // working normally.
+  const matched = checkMouseShortcuts(e.buttons, e.ctrlKey, e.altKey, e.shiftKey, e.metaKey);
+  if (matched) {
+    e.preventDefault();
+    e.stopPropagation();
+    return;
   }
+
+  // Unmatched click on the webview → let the page handle it
+  if (isOnWebview(e.target)) return;
 });
 
 document.addEventListener('mouseup', (e) => {
-  mouseButtonsDown &= ~(1 << (e.button));
+  mouseButtonsDown &= ~e.buttons;
 });
 
 document.addEventListener('contextmenu', (e) => {
@@ -1592,7 +1650,7 @@ function isOnWebview(target) {
 }
 
 function checkMouseShortcuts(buttons, ctrlKey, altKey, shiftKey, metaKey) {
-  if (!shortcuts) return;
+  if (!shortcuts) return false;
   for (const [actionName, sc] of Object.entries(shortcuts)) {
     if (!sc || sc.type !== 'mouse' || sc.buttons === 0) continue;
     if (sc.buttons !== buttons) continue;
@@ -1601,10 +1659,11 @@ function checkMouseShortcuts(buttons, ctrlKey, altKey, shiftKey, metaKey) {
     if ((sc.shift || false) !== shiftKey) continue;
     if ((sc.meta || false) !== metaKey) continue;
 
-    // Execute the action
+    // Execute the action and signal a match so the caller can suppress the page
     executeAction(actionName);
-    return;
+    return true;
   }
+  return false;
 }
 
 function executeAction(actionName) {
