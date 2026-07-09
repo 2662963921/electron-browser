@@ -59,4 +59,7 @@ contextBridge.exposeInMainWorld('browserAPI', {
   onNavigateToUrl: (callback) => {
     ipcRenderer.on('navigate-to-url', (_event, url) => callback(url));
   },
+  onDevToolsOpened: (callback) => {
+    ipcRenderer.on('devtools-opened', (_event, target) => callback(target));
+  },
 });

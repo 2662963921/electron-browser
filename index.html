@@ -732,6 +732,12 @@ async function init() {
     navigateTo(url);
   });
 
+  // DevTools open feedback (F12 = page, Ctrl+Shift+I = app shell)
+  api.onDevToolsOpened((target) => {
+    if (target === 'web') showToast('已打开【网页】开发者工具 — 按 F12 关闭');
+    else if (target === 'shell') showToast('已打开【软件外壳】开发者工具 — 按 Ctrl+Shift+I 关闭');
+  });
+
   // Get initial state
   config = await api.getConfig();
   bookmarks = config.bookmarks || [];

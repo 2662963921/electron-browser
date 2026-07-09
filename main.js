@@ -377,6 +377,31 @@ function setupIPC() {
   });
 }
 
+// --- F12 Developer Tools (for debugging transparency / layout) ---
+// Registered via globalShortcut so they work even when focus is inside the
+// webview guest (a normal document keydown listener would NOT fire there).
+function registerDevToolsShortcuts() {
+  // F12 → DevTools for the loaded web page (inspect page background / injected CSS)
+  try {
+    globalShortcut.register('F12', () => {
+      if (mainWindow && webviewContents && !webviewContents.isDestroyed()) {
+        try { webviewContents.openDevTools(); } catch (_) {}
+        try { mainWindow.webContents.send('devtools-opened', 'web'); } catch (_) {}
+      }
+    });
+  } catch (_) {}
+
+  // Ctrl+Shift+I → DevTools for the app shell (inspect window/body/#app background)
+  try {
+    globalShortcut.register('Control+Shift+I', () => {
+      if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
+        try { mainWindow.webContents.openDevTools(); } catch (_) {}
+        try { mainWindow.webContents.send('devtools-opened', 'shell'); } catch (_) {}
+      }
+    });
+  } catch (_) {}
+}
+
 function escapeHTML(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -413,6 +438,7 @@ app.whenReady().then(() => {
   setupIPC();
   createWindow();
   registerAllShortcuts();
+  registerDevToolsShortcuts();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
