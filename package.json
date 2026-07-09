@@ -6,7 +6,7 @@
   "main": "main.js",
   "scripts": {
     "start": "node start.js .",
-    "build": "set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ && set ELECTRON_CACHE=%USERPROFILE%\\.electron-cache && electron-builder --win portable",
+    "build": "set \"ELECTRON_MIRROR=https://cdn.npmmirror.com/binaries/electron/\"&& set \"ELECTRON_CACHE=%USERPROFILE%\\.electron-cache\"&& electron-builder --win portable",
     "build:fast": "mkdir dist\\app-tmp 2>nul & copy /Y main.js dist\\app-tmp\\ >nul & copy /Y preload.js dist\\app-tmp\\ >nul & copy /Y index.html dist\\app-tmp\\ >nul & copy /Y error.html dist\\app-tmp\\ >nul & node -e \"const a=require('@electron/asar');a.createPackage('dist/app-tmp','dist/win-unpacked/resources/app.asar').then(()=>{const fs=require('fs');fs.rmSync('dist/app-tmp',{recursive:true,force:true})})\" && node node_modules/electron-builder/cli.js --win portable --prepackaged=dist/win-unpacked"
   },
   "build": {
