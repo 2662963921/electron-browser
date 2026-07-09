@@ -386,20 +386,17 @@ function setupIPC() {
   });
 }
 
-// --- F12 Developer Tools (for debugging transparency / layout) ---
-// Registered via globalShortcut so they work even when focus is inside the
-// webview guest (a normal document keydown listener would NOT fire there).
+// --- DevTools shortcut handling ──────────────────────────────
+// Moved to before-input-event in the web-contents-created handler above.
+// Chromium has built-in F12 / Ctrl+Shift+I shortcuts at the webContents level
+// that globalShortcut CANNOT block. before-input-event intercepts keys BEFORE
+// Chromium processes them, so we can:
+//   • F12          → open app-shell DevTools (工具箱)
+//   • Ctrl+Shift+I → block entirely
+// globalShortcut is no longer used for DevTools (it would double-open with
+// before-input-event and cannot block Chromium's built-in handler).
 function registerDevToolsShortcuts() {
-  // F12 → DevTools for the app shell (工具箱: inspect window/body/#app background)
-  // Original Ctrl+Shift+I removed; original F12 web-page DevTools discarded.
-  try {
-    globalShortcut.register('F12', () => {
-      if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
-        try { mainWindow.webContents.openDevTools(); } catch (_) {}
-        try { mainWindow.webContents.send('devtools-opened', 'shell'); } catch (_) {}
-      }
-    });
-  } catch (_) {}
+  // Intentionally empty — DevTools shortcuts handled via before-input-event.
 }
 
 function escapeHTML(str) {
@@ -468,6 +465,31 @@ app.on('web-contents-created', (_event, contents) => {
   if (contents.getType() === 'webview') {
     webviewContents = contents;
   }
+
+  // ── DevTools shortcut interception ──────────────────────────
+  // Chromium has BUILT-IN DevTools shortcuts (F12, Ctrl+Shift+I) that fire at
+  // the webContents level — globalShortcut cannot block them. We intercept
+  // here via before-input-event (fires BEFORE Chromium processes the key):
+  //   • F12            → open app-shell DevTools (工具箱), block built-in
+  //   • Ctrl+Shift+I   → block entirely (user moved 工具箱 to F12)
+  contents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return;
+    const key = input.key;
+    // F12 → 工具箱 (app shell DevTools)
+    if (key === 'F12') {
+      event.preventDefault();
+      if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
+        try { mainWindow.webContents.openDevTools(); } catch (_) {}
+        try { mainWindow.webContents.send('devtools-opened', 'shell'); } catch (_) {}
+      }
+      return;
+    }
+    // Block Chromium's built-in Ctrl+Shift+I
+    if (key && key.toLowerCase() === 'i' && input.control && input.shift) {
+      event.preventDefault();
+      return;
+    }
+  });
 
   // Track last navigated URL for save-on-close
   contents.on('did-navigate', (_e, url) => {
