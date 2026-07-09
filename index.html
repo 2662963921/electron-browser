@@ -985,20 +985,32 @@ function injectSideButtonHandler() {
       (function() {
         if (window.__wbSideHandler) return;
         window.__wbSideHandler = true;
+        // Mouse shortcuts + side button back/forward
         document.addEventListener('mousedown', function(e) {
-          if (e.button === 3) {            // XButton1 → Back
+          // Side buttons: back/forward (default, always available)
+          if (e.button === 3) { e.preventDefault(); history.back(); return; }
+          if (e.button === 4) { e.preventDefault(); history.forward(); return; }
+          // Configured mouse shortcuts (read from window.__wbMouseShortcuts,
+          // updated by the host via executeJavaScript)
+          var scs = window.__wbMouseShortcuts;
+          if (!scs) return;
+          var buttons = e.buttons;
+          for (var action in scs) {
+            var sc = scs[action];
+            if (!sc || sc.type !== 'mouse' || sc.buttons === 0) continue;
+            if (sc.buttons !== buttons) continue;
+            if ((sc.ctrl || false) !== e.ctrlKey) continue;
+            if ((sc.alt || false) !== e.altKey) continue;
+            if ((sc.shift || false) !== e.shiftKey) continue;
+            if ((sc.meta || false) !== e.metaKey) continue;
             e.preventDefault();
             e.stopPropagation();
-            history.back();
-          } else if (e.button === 4) {     // XButton2 → Forward
-            e.preventDefault();
-            e.stopPropagation();
-            history.forward();
+            console.log('__wb_action__:' + action);
+            return;
           }
         }, true);
         // Shift+Space → scroll up (Electron webview sometimes doesn't forward
-        // the Shift modifier for Space, so the default scroll-up doesn't fire.
-        // We handle it manually, skipping input/textarea/contenteditable.)
+        // the Shift modifier for Space, so the default scroll-up doesn't fire.)
         document.addEventListener('keydown', function(e) {
           if (e.key === ' ' && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
             var tag = (e.target && e.target.tagName || '').toLowerCase();
@@ -1009,6 +1021,24 @@ function injectSideButtonHandler() {
         }, true);
       })();
     `);
+    // Push current mouse shortcuts to the guest
+    updateWebviewShortcuts();
+  } catch (_) {}
+}
+
+// Push configured mouse shortcuts to the webview guest so combinations
+// work even when focus is inside the webview (the host's mousedown handler
+// doesn't fire for clicks inside the guest).
+function updateWebviewShortcuts() {
+  try {
+    var mouseShortcuts = {};
+    for (var name in shortcuts) {
+      var sc = shortcuts[name];
+      if (sc && sc.type === 'mouse' && sc.buttons > 0) {
+        mouseShortcuts[name] = sc;
+      }
+    }
+    webview.executeJavaScript('window.__wbMouseShortcuts = ' + JSON.stringify(mouseShortcuts) + ';').catch(() => {});
   } catch (_) {}
 }
 
@@ -1131,6 +1161,16 @@ function setupWebview() {
     updateBookmarkBtn();
     // (Re)inject the in-guest side-button (back/forward) handler
     injectSideButtonHandler();
+  });
+
+  // Receive action signals from the webview guest (mouse shortcuts triggered
+  // inside the guest use console.log('__wb_action__:actionName') to ask the
+  // host to execute the action, since the guest can't call host APIs directly).
+  webview.addEventListener('console-message', (e) => {
+    if (e.message && e.message.startsWith('__wb_action__:')) {
+      const action = e.message.substring('__wb_action__:'.length);
+      executeAction(action);
+    }
   });
 
   webview.addEventListener('did-navigate', (e) => {
@@ -1525,6 +1565,7 @@ let currentRecording = null;
 let recordingButtons = 0;        // accumulated bitmask of pressed buttons
 let recordingTimer = null;       // timeout to auto-finish if no more buttons
 let recordingModifiers = null;   // {ctrl,alt,shift,meta} from last mousedown
+let recordingFinishing = false;  // prevents re-entry during async finishMouseRecording
 
 function renderShortcutsList() {
   const container = document.getElementById('shortcut-list');
@@ -1561,6 +1602,7 @@ function renderShortcutsList() {
       shortcuts[name] = defaults[name];
       await api.updateShortcut(name, shortcuts[name]);
       renderShortcutsList();
+      updateWebviewShortcuts();
       showToast('快捷键已重置为默认');
     });
   }
@@ -1612,6 +1654,7 @@ function stopAllRecording() {
   if (recordingTimer) { clearTimeout(recordingTimer); recordingTimer = null; }
   recordingButtons = 0;
   recordingModifiers = null;
+  recordingFinishing = false;
   if (currentRecording) {
     currentRecording.element.classList.remove('recording');
     currentRecording.element.textContent = formatShortcut(shortcuts[currentRecording.actionName]);
@@ -1620,10 +1663,11 @@ function stopAllRecording() {
 }
 
 // Finish recording a mouse shortcut after the user releases all buttons
-// (or after a 400ms idle timeout). Supports single buttons AND combinations
+// (or after a 2s idle timeout). Supports single buttons AND combinations
 // like middle+left, middle+right, middle+side, etc.
 async function finishMouseRecording() {
-  if (!currentRecording || recordingButtons === 0) return;
+  if (!currentRecording || recordingButtons === 0 || recordingFinishing) return;
+  recordingFinishing = true;  // block re-entry during async IPC
   if (recordingTimer) { clearTimeout(recordingTimer); recordingTimer = null; }
   const m = recordingModifiers || { ctrl: false, alt: false, shift: false, meta: false };
   const shortcut = {
@@ -1642,6 +1686,8 @@ async function finishMouseRecording() {
   currentRecording = null;
   recordingButtons = 0;
   recordingModifiers = null;
+  recordingFinishing = false;
+  updateWebviewShortcuts();  // push new shortcuts to the webview guest
   showToast(`快捷键已设置: ${formatShortcut(shortcut)}`);
 }
 
@@ -1698,14 +1744,15 @@ document.addEventListener('mousedown', async (e) => {
   if (currentRecording) {
     // Only record clicks that land on the app shell (not inside the webview)
     if (isOnWebview(e.target)) return;
+    if (recordingFinishing) return;  // finish in progress, ignore
     e.preventDefault();
     e.stopPropagation();
     // Accumulate buttons — don't finish yet, wait for more buttons or release
     recordingButtons |= e.buttons;
     recordingModifiers = { ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey };
     if (recordingTimer) clearTimeout(recordingTimer);
-    // Auto-finish after 400ms of no new button presses
-    recordingTimer = setTimeout(finishMouseRecording, 400);
+    // Auto-finish after 2s of no new button presses (generous for combinations)
+    recordingTimer = setTimeout(finishMouseRecording, 2000);
     return;
   }
 
@@ -1740,7 +1787,7 @@ document.addEventListener('mousedown', async (e) => {
 document.addEventListener('mouseup', (e) => {
   mouseButtonsDown &= ~e.buttons;
   // If recording and all buttons released, finish immediately
-  if (currentRecording && recordingButtons > 0) {
+  if (currentRecording && recordingButtons > 0 && !recordingFinishing) {
     // e.buttons on mouseup = state AFTER release; 0 means all released
     if (e.buttons === 0 || (recordingButtons & e.buttons) === 0) {
       if (recordingTimer) clearTimeout(recordingTimer);
