@@ -721,21 +721,32 @@ async function init() {
   applyConfig();
   setupWebview();
 
-  // Restore last URL if configured, otherwise go to homepage
-  // Use dom-ready to ensure webview is initialized before navigating
-  webview.addEventListener('dom-ready', function initialNav() {
-    webview.removeEventListener('dom-ready', initialNav);
-    if (config.restoreLastURL && config.lastURL && config.lastURL !== 'about:blank') {
-      console.log('Restoring last URL:', config.lastURL);
-      navigateTo(config.lastURL);
-    } else {
-      const target = (config.homepage && config.homepage !== 'about:blank')
-        ? config.homepage
-        : 'https://www.bing.com';
-      console.log('Navigating to:', target);
-      navigateTo(target);
+  // Determine initial target URL
+  const initialTarget = (config.restoreLastURL && config.lastURL && config.lastURL !== 'about:blank')
+    ? config.lastURL
+    : (config.homepage && config.homepage !== 'about:blank')
+      ? config.homepage
+      : 'https://www.bing.com';
+  console.log('Initial target:', initialTarget);
+
+  // Guard: if webview is still on about:blank after first load, navigate then too
+  let initialNavDone = false;
+  webview.addEventListener('did-finish-load', function initialNavGuard() {
+    if (initialNavDone) return;
+    initialNavDone = true;
+    try {
+      if (webview.getURL() === 'about:blank') {
+        console.log('Initial nav guard: navigating to', initialTarget);
+        navigateTo(initialTarget);
+      }
+    } catch (_) {
+      navigateTo(initialTarget);
     }
   }, { once: true });
+
+  // Navigate immediately — the webview element already exists in DOM
+  // loadURL() queues the navigation internally even if about:blank hasn't finished
+  navigateTo(initialTarget);
 }
 
 async function applyConfig() {
@@ -1051,7 +1062,20 @@ function navigateTo(rawUrl) {
   }
 
   document.getElementById('url-bar').value = url;
-  webview.loadURL(url);
+  // Use loadURL first, fall back to setting src attribute directly
+  try {
+    webview.loadURL(url);
+  } catch (_) {
+    webview.src = url;
+  }
+  // Verify navigation worked; if still on about:blank, set src as fallback
+  setTimeout(() => {
+    try {
+      if (webview.getURL() === 'about:blank' && url !== 'about:blank') {
+        webview.src = url;
+      }
+    } catch (_) {}
+  }, 100);
 }
 
 function updateNavButtons() {
