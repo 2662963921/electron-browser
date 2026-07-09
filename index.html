@@ -423,6 +423,7 @@ body.controls-hidden #app { border-radius: 0; }
 /* ============================================================
    Transparent Mode
    ============================================================ */
+html.transparent-mode,
 body.transparent-mode,
 body.transparent-mode #app,
 body.transparent-mode #titlebar,
@@ -810,8 +811,10 @@ function updateTransparentMode() {
   // even with the toolbar visible.
   const transparent = controlsHidden && config.transparentBg;
   if (transparent) {
+    document.documentElement.classList.add('transparent-mode');
     document.body.classList.add('transparent-mode');
   } else {
+    document.documentElement.classList.remove('transparent-mode');
     document.body.classList.remove('transparent-mode');
   }
   // Set webview background via IPC (main process sets webContents backgroundColor)
