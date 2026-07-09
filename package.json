@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node start.js .",
     "build": "set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ && set ELECTRON_CACHE=%USERPROFILE%\\.electron-cache && electron-builder --win portable",
-    "build:fast": "electron-builder --win portable --prepackaged=dist/win-unpacked --config.win.target=portable"
+    "build:fast": "mkdir dist\\app-tmp 2>nul & copy /Y main.js dist\\app-tmp\\ >nul & copy /Y preload.js dist\\app-tmp\\ >nul & copy /Y index.html dist\\app-tmp\\ >nul & copy /Y error.html dist\\app-tmp\\ >nul & node -e \"const a=require('@electron/asar');a.createPackage('dist/app-tmp','dist/win-unpacked/resources/app.asar').then(()=>{const fs=require('fs');fs.rmSync('dist/app-tmp',{recursive:true,force:true})})\" && node node_modules/electron-builder/cli.js --win portable --prepackaged=dist/win-unpacked"
   },
   "build": {
     "appId": "com.electron.browser",
@@ -16,7 +16,9 @@
       "output": "dist"
     },
     "win": {
-      "target": ["portable"],
+      "target": [
+        "portable"
+      ],
       "icon": null,
       "requestedExecutionLevel": "asInvoker"
     },
@@ -28,6 +30,7 @@
     ]
   },
   "devDependencies": {
+    "@electron/asar": "^4.2.0",
     "electron": "^28.0.0",
     "electron-builder": "^26.15.3"
   }

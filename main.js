@@ -60,11 +60,14 @@ const defaultConfig = {
 let config = { ...defaultConfig };
 
 function getConfigPath() {
-  // Packaged exe → config.json next to the exe file
-  // Development → config.json in project root
-  const dir = app.isPackaged
-    ? path.dirname(app.getPath('exe'))
-    : __dirname;
+  let dir;
+  if (app.isPackaged) {
+    // Packaged exe: try portable exe directory first, fall back to userData
+    dir = process.env.PORTABLE_EXECUTABLE_DIR || app.getPath('userData');
+  } else {
+    // Development: project root
+    dir = __dirname;
+  }
   return path.join(dir, 'config.json');
 }
 
