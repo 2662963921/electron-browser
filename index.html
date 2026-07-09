@@ -666,6 +666,20 @@ let controlsHidden = false;
 let alwaysOnTop = false;
 let darkMode = false;
 
+// --- Initial navigation state (race-free webview startup) ---
+let initialNavigated = false;
+let pendingInitialTarget = null;
+let webviewGuestReady = false;
+
+// Navigate to the queued initial target, but only once the webview guest
+// is actually attached (otherwise webview.src is silently ignored).
+function tryInitialNavigate() {
+  if (initialNavigated || !pendingInitialTarget || !webviewGuestReady) return;
+  initialNavigated = true;
+  console.log('[init] Navigating to initial target:', pendingInitialTarget);
+  navigateTo(pendingInitialTarget);
+}
+
 // Shortcut action labels
 const shortcutLabels = {
   closeWindow: '关闭窗口',
@@ -679,6 +693,11 @@ const shortcutLabels = {
 // ============================================================
 
 async function init() {
+  // Register webview listeners synchronously FIRST — before any await —
+  // otherwise we miss the guest's did-attach / dom-ready events. That was the
+  // root cause of the "URL bar shows Bing but page is blank until you click →" bug.
+  setupWebview();
+
   // Listen for IPC events
   api.onInitConfig(async (cfg) => {
     config = cfg;
@@ -718,7 +737,6 @@ async function init() {
   alwaysOnTop = config.alwaysOnTop;
 
   applyConfig();
-  setupWebview();
 
   // Determine initial target URL
   const initialTarget = (config.restoreLastURL && config.lastURL && config.lastURL !== 'about:blank')
@@ -726,11 +744,17 @@ async function init() {
     : (config.homepage && config.homepage !== 'about:blank')
       ? config.homepage
       : 'https://www.bing.com';
-  console.log('Initial target:', initialTarget);
+  console.log('[init] Initial target:', initialTarget);
 
-  // Navigate immediately. Webview starts with no src, so this is a clean first navigation.
-  // Use setTimeout(0) to yield one tick so the webview element is fully attached.
-  setTimeout(() => navigateTo(initialTarget), 0);
+  // Queue the initial navigation. setupWebview's did-attach / dom-ready handlers
+  // will fire it as soon as the webview guest is ready. If the guest is already
+  // ready, tryInitialNavigate() navigates immediately.
+  pendingInitialTarget = initialTarget;
+  tryInitialNavigate();
+
+  // Belt-and-suspenders: if the guest is somehow still not ready, force readiness
+  // and retry the navigation after 2s.
+  setTimeout(() => { webviewGuestReady = true; tryInitialNavigate(); }, 2000);
 }
 
 async function applyConfig() {
@@ -874,7 +898,25 @@ function updatePinIndicator() {
 // ============================================================
 
 function setupWebview() {
-  api.setWebviewId(webview.getWebContentsId());
+  // Register the guest id once it actually exists (guest may not be attached yet
+  // when this runs, so getWebContentsId can throw — wrap it).
+  const registerGuest = () => {
+    try { api.setWebviewId(webview.getWebContentsId()); } catch (_) {}
+  };
+
+  // --- Guest attachment / readiness (initial navigation trigger) ---
+  webview.addEventListener('did-attach', () => {
+    webviewGuestReady = true;
+    registerGuest();
+    if (controlsHidden) injectHideScrollbarCSS();
+    tryInitialNavigate();
+  });
+
+  webview.addEventListener('dom-ready', () => {
+    webviewGuestReady = true;
+    if (controlsHidden) injectHideScrollbarCSS();
+    tryInitialNavigate();
+  });
 
   // --- Navigation Events ---
   webview.addEventListener('did-start-loading', () => {
@@ -998,11 +1040,7 @@ function setupWebview() {
   });
 
   // When controls hidden, inject scrollbar hiding CSS into webview
-  webview.addEventListener('dom-ready', () => {
-    if (controlsHidden) {
-      injectHideScrollbarCSS();
-    }
-  });
+  // (handled in the did-attach / dom-ready readiness handlers above)
 }
 
 // ============================================================
