@@ -124,6 +124,12 @@ html, body {
   transition: background var(--transition-fast), color var(--transition-fast);
 }
 .win-btn:hover { background: var(--control-btn-hover); }
+.win-btn:focus-visible { outline: none; }
+.win-btn svg { width: 12px; height: 12px; display: block; }
+.win-btn.close svg { width: 13px; height: 13px; }
+#btn-max .ic-restore { display: none; }
+#btn-max.maximized .ic-max { display: none; }
+#btn-max.maximized .ic-restore { display: block; }
 .win-btn.close:hover { background: var(--danger); color: #fff; }
 
 /* Toolbar */
@@ -162,9 +168,14 @@ html, body {
 .tool-btn:disabled { opacity: 0.35; cursor: default; }
 .tool-btn:disabled:hover { background: transparent; color: var(--text-secondary); }
 .tool-btn.active { color: var(--accent); background: var(--accent-light); }
+.tool-btn svg { width: 18px; height: 18px; display: block; }
+/* Filled star when bookmarked */
+#btn-bookmark svg { fill: none; }
+#btn-bookmark.active svg { fill: currentColor; }
 /* Per-button polish */
-#btn-home { font-size: 19px; }
-#btn-settings { font-size: 17px; transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast); }
+#btn-home svg { width: 19px; height: 19px; }
+#btn-settings svg { width: 17px; height: 17px; transition: transform 0.2s; }
+#btn-settings.active svg { transform: rotate(45deg); }
 #btn-settings.active {
   color: #fff; background: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
@@ -210,6 +221,7 @@ html, body {
   display: flex; align-items: center; justify-content: center;
 }
 #url-go-btn:hover { background: var(--accent-light); }
+#url-go-btn svg { width: 15px; height: 15px; display: block; }
 
 /* Bookmark Dropdown */
 #bookmark-dropdown-wrap {
@@ -592,31 +604,31 @@ body.transparent-mode #app {
     <div id="titlebar">
       <span class="title-text" id="title-text">网页浏览器</span>
       <div class="win-controls">
-        <button class="win-btn" id="btn-min" title="最小化" onclick="window.browserAPI.minimizeWindow()">&#x2014;</button>
-        <button class="win-btn" id="btn-max" title="最大化" onclick="window.browserAPI.maximizeWindow()">&#x25A1;</button>
-        <button class="win-btn close" id="btn-close" title="关闭" onclick="window.browserAPI.closeWindow()">&#x2715;</button>
+        <button class="win-btn" id="btn-min" title="最小化" onclick="window.browserAPI.minimizeWindow()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+        <button class="win-btn" id="btn-max" title="最大化" onclick="window.browserAPI.maximizeWindow()"><svg class="ic-max" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="14" rx="1"/></svg><svg class="ic-restore" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="1"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/></svg></button>
+        <button class="win-btn close" id="btn-close" title="关闭" onclick="window.browserAPI.closeWindow()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
       </div>
     </div>
 
     <!-- Toolbar -->
     <div id="toolbar">
-      <button class="tool-btn" id="btn-back" title="后退" onclick="goBack()">&#x25C0;</button>
-      <button class="tool-btn" id="btn-forward" title="前进" onclick="goForward()">&#x25B6;</button>
-      <button class="tool-btn" id="btn-refresh" title="刷新" onclick="refresh()">&#x21BB;</button>
-      <button class="tool-btn" id="btn-home" title="主页" onclick="goHome()">&#x2302;</button>
+      <button class="tool-btn" id="btn-back" title="后退" onclick="goBack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <button class="tool-btn" id="btn-forward" title="前进" onclick="goForward()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+      <button class="tool-btn" id="btn-refresh" title="刷新" onclick="refresh()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
+      <button class="tool-btn" id="btn-home" title="主页" onclick="goHome()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></button>
 
       <span class="tool-sep"></span>
 
       <div id="url-bar-wrap">
         <input type="text" id="url-bar" placeholder="输入网址或搜索..." spellcheck="false">
-        <button id="url-go-btn" title="转到" onclick="navigateToUrl()">&#x2192;</button>
+        <button id="url-go-btn" title="转到" onclick="navigateToUrl()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
       </div>
 
       <span class="tool-sep"></span>
 
       <div id="bookmark-dropdown-wrap">
-        <button class="tool-btn" id="btn-bookmark" title="收藏" onclick="toggleBookmark()">&#x2606;</button>
-        <button class="tool-btn" id="btn-bookmark-list" title="收藏列表" onclick="toggleBookmarkDropdown()">&#x25BE;</button>
+        <button class="tool-btn" id="btn-bookmark" title="收藏" onclick="toggleBookmark()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></button>
+        <button class="tool-btn" id="btn-bookmark-list" title="收藏列表" onclick="toggleBookmarkDropdown()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
         <div id="bookmark-dropdown">
           <div id="bookmark-empty">暂无收藏</div>
         </div>
@@ -625,7 +637,7 @@ body.transparent-mode #app {
       <span class="tool-sep"></span>
 
       <div id="settings-dropdown-wrap">
-        <button class="tool-btn" id="btn-settings" title="设置" onclick="toggleSettingsDropdown()">&#x2699;</button>
+        <button class="tool-btn" id="btn-settings" title="设置" onclick="toggleSettingsDropdown()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
         <div id="settings-dropdown">
           <!-- Shortcuts Section -->
           <div class="settings-section">
@@ -1041,8 +1053,8 @@ async function updateMaxBtn(maximized) {
   if (maximized === undefined) {
     maximized = await api.isMaximized();
   }
-  btn.innerHTML = maximized ? '&#x2750;' : '&#x25A1;';
-  btn.title = maximized ? 'Restore' : 'Maximize';
+  btn.classList.toggle('maximized', maximized);
+  btn.title = maximized ? '向下还原' : '最大化';
 }
 
 function updatePinIndicator() {
@@ -1312,7 +1324,6 @@ async function toggleBookmark() {
 async function updateBookmarkBtn() {
   const isBm = await api.isBookmarked(currentURL);
   const btn = document.getElementById('btn-bookmark');
-  btn.innerHTML = isBm ? '&#x2605;' : '&#x2606;';
   btn.classList.toggle('active', isBm);
 }
 

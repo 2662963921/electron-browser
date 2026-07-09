@@ -391,6 +391,7 @@ function setupIPC() {
 // webview guest (a normal document keydown listener would NOT fire there).
 function registerDevToolsShortcuts() {
   // F12 → DevTools for the app shell (工具箱: inspect window/body/#app background)
+  // Original Ctrl+Shift+I removed; original F12 web-page DevTools discarded.
   try {
     globalShortcut.register('F12', () => {
       if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
