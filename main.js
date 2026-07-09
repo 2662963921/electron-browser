@@ -291,8 +291,9 @@ function setupIPC() {
 
   ipcMain.handle('add-bookmark', (_event, bookmark) => {
     if (!config.bookmarks) config.bookmarks = [];
-    if (!config.bookmarks.find(b => b.url === bookmark.url)) {
-      config.bookmarks.push(bookmark);
+    const norm = normalizeUrl(bookmark.url);
+    if (!config.bookmarks.find(b => normalizeUrl(b.url) === norm)) {
+      config.bookmarks.push({ ...bookmark, url: norm });
       saveConfig(config);
     }
     return config.bookmarks;
@@ -300,14 +301,16 @@ function setupIPC() {
 
   ipcMain.handle('remove-bookmark', (_event, url) => {
     if (!config.bookmarks) config.bookmarks = [];
-    config.bookmarks = config.bookmarks.filter(b => b.url !== url);
+    const norm = normalizeUrl(url);
+    config.bookmarks = config.bookmarks.filter(b => normalizeUrl(b.url) !== norm);
     saveConfig(config);
     return config.bookmarks;
   });
 
   ipcMain.handle('is-bookmarked', (_event, url) => {
     if (!config.bookmarks) return false;
-    return config.bookmarks.some(b => b.url === url);
+    const norm = normalizeUrl(url);
+    return config.bookmarks.some(b => normalizeUrl(b.url) === norm);
   });
 
   // --- Shortcuts ---
@@ -376,6 +379,23 @@ function setupIPC() {
 
 function escapeHTML(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Normalize a URL for bookmark storage/comparison so that e.g.
+// "https://www.bing.com/" vs "https://www.bing.com" vs "http://www.bing.com"
+// are treated as the SAME bookmark. Lowercases scheme+host, strips trailing
+// slash(es) on the path, and preserves query/fragment.
+function normalizeUrl(u) {
+  if (!u || typeof u !== 'string') return u;
+  try {
+    const p = new URL(u.trim());
+    let path = p.pathname;
+    if (path.length > 1) path = path.replace(/\/+$/, '');
+    return `${p.protocol.toLowerCase()}//${p.hostname.toLowerCase()}` +
+           `${p.port ? ':' + p.port : ''}${path}${p.search}${p.hash}`;
+  } catch (_) {
+    return u;
+  }
 }
 
 // ============================================================

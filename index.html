@@ -423,14 +423,18 @@ body.controls-hidden #app { border-radius: 0; }
 /* ============================================================
    Transparent Mode
    ============================================================ */
-body.transparent-mode {
+body.transparent-mode,
+body.transparent-mode #app,
+body.transparent-mode #titlebar,
+body.transparent-mode #toolbar,
+body.transparent-mode #webview-container,
+body.transparent-mode #url-bar,
+body.transparent-mode .panel,
+body.transparent-mode .sidebar {
   background: transparent !important;
 }
 body.transparent-mode #app {
-  background: transparent !important;
-}
-body.transparent-mode #webview-container {
-  background: transparent !important;
+  box-shadow: none !important;
 }
 
 /* ============================================================
@@ -572,7 +576,7 @@ body.transparent-mode #webview-container {
           <div class="settings-section">
             <h4>透明度</h4>
             <div class="setting-row">
-              <label for="chk-transparent">隐藏控件时背景全透明</label>
+              <label for="chk-transparent">软件背景全透明（无边框）</label>
               <input type="checkbox" id="chk-transparent" onchange="onTransparentToggle()">
             </div>
           </div>
@@ -794,6 +798,10 @@ async function applyControlsHidden() {
 }
 
 function updateTransparentMode() {
+  // Transparency only matters in the frameless / hide-controls state
+  // (controlsHidden === true). In the non-frameless (controls-shown) state it
+  // must NOT trigger — that was the bug where the background turned transparent
+  // even with the toolbar visible.
   const transparent = controlsHidden && config.transparentBg;
   if (transparent) {
     document.body.classList.add('transparent-mode');
@@ -815,7 +823,9 @@ let transparentCSSKey = null;
 function injectWebviewTransparentCSS() {
   removeWebviewTransparentCSS();
   try {
-    webview.insertCSS('* { background-color: transparent !important; } ::-webkit-scrollbar { display: none !important; }')
+    // Make EVERY element fully transparent, including background images, so the
+    // desktop shows through even when a page sets a background-image.
+    webview.insertCSS('* { background-color: transparent !important; background-image: none !important; } ::-webkit-scrollbar { display: none !important; }')
       .then(key => { transparentCSSKey = key; })
       .catch(() => {});
   } catch (_) {}
@@ -826,6 +836,34 @@ function removeWebviewTransparentCSS() {
     try { webview.removeInsertedCSS(transparentCSSKey); } catch (_) {}
     transparentCSSKey = null;
   }
+}
+
+// --- Mouse side buttons (back/forward) inside the webview guest ---
+// The host document's mousedown does NOT reliably receive mouse events that
+// occur inside the <webview> guest process, so after clicking a bookmark (which
+// moves focus into the guest) the side buttons would stop navigating. We inject
+// a capture-phase listener into the guest itself; it calls history.back/forward
+// and stops propagation so the host handler never double-fires.
+function injectSideButtonHandler() {
+  try {
+    webview.executeJavaScript(`
+      (function() {
+        if (window.__wbSideHandler) return;
+        window.__wbSideHandler = true;
+        document.addEventListener('mousedown', function(e) {
+          if (e.button === 3) {            // XButton1 → Back
+            e.preventDefault();
+            e.stopPropagation();
+            history.back();
+          } else if (e.button === 4) {     // XButton2 → Forward
+            e.preventDefault();
+            e.stopPropagation();
+            history.forward();
+          }
+        }, true);
+      })();
+    `);
+  } catch (_) {}
 }
 
 function injectHideScrollbarCSS() {
@@ -909,6 +947,9 @@ function setupWebview() {
     webviewGuestReady = true;
     registerGuest();
     if (controlsHidden) injectHideScrollbarCSS();
+    // The guest now exists — apply (or re-apply) transparency so the initial
+    // setWebviewBg IPC (which was skipped while webviewContents was null) takes effect.
+    updateTransparentMode();
     tryInitialNavigate();
   });
 
@@ -933,12 +974,17 @@ function setupWebview() {
 
   // Re-inject CSS on every page load (navigation clears injected CSS)
   webview.addEventListener('did-finish-load', () => {
+    // Re-apply transparency only in frameless/hide-controls state
     if (controlsHidden && config.transparentBg) {
       injectWebviewTransparentCSS();
     }
     if (darkMode) {
       injectWebviewDarkMode();
     }
+    // Re-sync the bookmark star (covers redirects / SPA where did-navigate may not fire)
+    updateBookmarkBtn();
+    // (Re)inject the in-guest side-button (back/forward) handler
+    injectSideButtonHandler();
   });
 
   webview.addEventListener('did-navigate', (e) => {
@@ -949,12 +995,24 @@ function setupWebview() {
     saveLastURL(currentURL);
   });
 
+  // Sync the bookmark star as soon as navigation begins (covers cases where
+  // did-finish-load alone left the star stale for a tick).
+  webview.addEventListener('will-navigate', (e) => {
+    if (e.url && e.url !== 'about:blank') {
+      currentURL = e.url;
+      updateBookmarkBtn();
+    }
+  });
+
   webview.addEventListener('did-navigate-in-page', (e) => {
     if (e.isMainFrame) {
       currentURL = e.url;
       document.getElementById('url-bar').value = currentURL;
       updateNavButtons();
+      updateBookmarkBtn();
       saveLastURL(currentURL);
+      // Re-inject side-button handler (SPA route changes wipe injected scripts)
+      injectSideButtonHandler();
     }
   });
 
@@ -1223,7 +1281,7 @@ async function onTransparentToggle() {
   config.transparentBg = document.getElementById('chk-transparent').checked;
   await api.updateConfig({ transparentBg: config.transparentBg });
   updateTransparentMode();
-  showToast(config.transparentBg ? '透明模式已启用（隐藏控件后生效）' : '透明模式已关闭');
+  showToast(config.transparentBg ? '透明模式已启用：软件背景全透明' : '透明模式已关闭');
 }
 
 async function onRestoreUrlToggle() {
