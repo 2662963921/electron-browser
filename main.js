@@ -250,6 +250,11 @@ function registerAllShortcuts() {
       }
     }
   }
+  // F11 ALWAYS toggles frameless (hide controls), independent of the user's
+  // configurable shortcut. So even if "hide controls" is rebound to a mouse
+  // button (or removed), F11 still works. Registered after the loop so it is
+  // never wiped by the configurable bindings above.
+  try { globalShortcut.register('F11', shortcutActions.hideControls); } catch (_) {}
 }
 
 function syncDarkMode() {
@@ -385,19 +390,9 @@ function setupIPC() {
 // Registered via globalShortcut so they work even when focus is inside the
 // webview guest (a normal document keydown listener would NOT fire there).
 function registerDevToolsShortcuts() {
-  // F12 → DevTools for the loaded web page (inspect page background / injected CSS)
+  // F12 → DevTools for the app shell (工具箱: inspect window/body/#app background)
   try {
     globalShortcut.register('F12', () => {
-      if (mainWindow && webviewContents && !webviewContents.isDestroyed()) {
-        try { webviewContents.openDevTools(); } catch (_) {}
-        try { mainWindow.webContents.send('devtools-opened', 'web'); } catch (_) {}
-      }
-    });
-  } catch (_) {}
-
-  // Ctrl+Shift+I → DevTools for the app shell (inspect window/body/#app background)
-  try {
-    globalShortcut.register('Control+Shift+I', () => {
       if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
         try { mainWindow.webContents.openDevTools(); } catch (_) {}
         try { mainWindow.webContents.send('devtools-opened', 'shell'); } catch (_) {}

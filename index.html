@@ -114,14 +114,14 @@ html, body {
   -webkit-app-region: no-drag;
 }
 .win-btn {
-  width: 34px; height: 26px;
+  width: 38px; height: 32px;
   border: none; background: transparent;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   color: var(--text-secondary);
-  font-size: 14px;
-  border-radius: 4px;
-  transition: background var(--transition-fast);
+  font-size: 13px;
+  border-radius: 6px;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 .win-btn:hover { background: var(--control-btn-hover); }
 .win-btn.close:hover { background: var(--danger); color: #fff; }
@@ -162,6 +162,14 @@ html, body {
 .tool-btn:disabled { opacity: 0.35; cursor: default; }
 .tool-btn:disabled:hover { background: transparent; color: var(--text-secondary); }
 .tool-btn.active { color: var(--accent); background: var(--accent-light); }
+/* Per-button polish */
+#btn-home { font-size: 19px; }
+#btn-settings { font-size: 17px; transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast); }
+#btn-settings.active {
+  color: #fff; background: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+#btn-bookmark-list.active { color: var(--accent); background: var(--accent-light); }
 
 .tool-sep {
   width: 1px; height: 20px;
@@ -213,7 +221,7 @@ html, body {
 }
 #bookmark-dropdown {
   position: absolute;
-  top: 40px; right: 0;
+  top: calc(100% + 8px); right: 0;
   width: 280px; max-height: 320px;
   overflow-y: auto;
   background: var(--bg-dropdown);
@@ -223,6 +231,13 @@ html, body {
   z-index: 1000;
   display: none;
   padding: 6px 0;
+}
+#bookmark-dropdown::before {
+  content: '';
+  position: absolute; top: -6px; right: 14px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 6px solid var(--border-color);
 }
 #bookmark-dropdown.show { display: block; }
 .bkm-item {
@@ -274,7 +289,7 @@ html, body {
 }
 #settings-dropdown {
   position: absolute;
-  top: 40px; right: 0;
+  top: calc(100% + 8px); right: 0;
   width: 360px; max-height: 520px;
   overflow-y: auto;
   background: var(--bg-dropdown);
@@ -284,6 +299,13 @@ html, body {
   z-index: 1000;
   display: none;
   padding: 0;
+}
+#settings-dropdown::before {
+  content: '';
+  position: absolute; top: -6px; right: 14px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 6px solid var(--border-color);
 }
 #settings-dropdown.show { display: block; }
 
@@ -770,10 +792,9 @@ async function init() {
     navigateTo(url);
   });
 
-  // DevTools open feedback (F12 = page, Ctrl+Shift+I = app shell)
+  // DevTools open feedback (F12 = 工具箱 / app shell)
   api.onDevToolsOpened((target) => {
-    if (target === 'web') showToast('已打开【网页】开发者工具 — 按 F12 关闭');
-    else if (target === 'shell') showToast('已打开【软件外壳】开发者工具 — 按 Ctrl+Shift+I 关闭');
+    if (target === 'shell') showToast('已打开【工具箱】开发者工具 — 按 F12 关闭');
   });
 
   // Get initial state
@@ -869,27 +890,67 @@ let transparentCSSKey = null;
 function injectWebviewTransparentCSS() {
   removeWebviewTransparentCSS();
   try {
-    // Strip EVERY background (color, image, gradient) from all elements so only
-    // the foreground text/content remains and the desktop shows through.
-    // Also hide visual media elements: many sites (e.g. Bing's daily background)
-    // paint their "background image" using a real <img> element, which is NOT
-    // covered by `background-image: none` — so we explicitly hide img/picture/
-    // video/canvas to stop them from blocking the transparency.
+    // Strip CSS backgrounds (color / image / gradient) from every element so
+    // the page becomes see-through. We deliberately do NOT hide all <img> here
+    // — that would also kill ordinary content images the user wants to keep.
     const css = `
       *, *::before, *::after, :root, html, body {
         background: transparent !important;
         background-color: transparent !important;
         background-image: none !important;
       }
-      img, picture, video, canvas {
-        visibility: hidden !important;
-      }
       ::-webkit-scrollbar { display: none !important; }
     `;
     webview.insertCSS(css)
       .then(key => { transparentCSSKey = key; })
       .catch(() => {});
+    // Then, via in-page JS, hide ONLY the full-bleed "background" media
+    // (e.g. Bing's daily <img> that covers the whole viewport) while leaving
+    // normal content images visible.
+    stripFullBleedBackgrounds();
   } catch (_) {}
+}
+
+// Hide only images/media used as a full-screen background. Re-run on a couple
+// of delays because some sites (Bing) inject their background image lazily
+// after the initial load event.
+function stripFullBleedBackgrounds() {
+  const fn = `(${stripFullBleedImpl.toString()})();`;
+  webview.executeJavaScript(fn).catch(() => {});
+}
+
+// Reverse stripFullBleedBackgrounds when transparency is turned off.
+function clearFullBleedBackgrounds() {
+  webview.executeJavaScript(`
+    document.querySelectorAll('[data-wb-hidden]').forEach(function(el){
+      el.style.removeProperty('visibility');
+      el.removeAttribute('data-wb-hidden');
+    });
+  `).catch(() => {});
+}
+
+// Runs INSIDE the web page. Finds media that covers most of the viewport and
+// is positioned behind the content, and hides just those.
+function stripFullBleedImpl() {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  function process() {
+    const els = document.querySelectorAll('img, picture, video, [role="img"]');
+    els.forEach(function (el) {
+      const cs = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      const covers = (r.width >= vw * 0.7 || r.width >= 900) &&
+                     (r.height >= vh * 0.7 || r.height >= 600);
+      const positioned = cs.position === 'absolute' || cs.position === 'fixed';
+      const behind = (parseInt(cs.zIndex, 10) < 0);
+      if (covers && (positioned || behind)) {
+        el.setAttribute('data-wb-hidden', '1');
+        el.style.setProperty('visibility', 'hidden', 'important');
+      }
+    });
+  }
+  process();
+  setTimeout(process, 600);
+  setTimeout(process, 1500);
 }
 
 function removeWebviewTransparentCSS() {
@@ -897,6 +958,7 @@ function removeWebviewTransparentCSS() {
     try { webview.removeInsertedCSS(transparentCSSKey); } catch (_) {}
     transparentCSSKey = null;
   }
+  clearFullBleedBackgrounds();
 }
 
 // --- Mouse side buttons (back/forward) inside the webview guest ---
@@ -1258,7 +1320,9 @@ function toggleBookmarkDropdown() {
   const dd = document.getElementById('bookmark-dropdown');
   const settingsDD = document.getElementById('settings-dropdown');
   settingsDD.classList.remove('show');
+  document.getElementById('btn-settings').classList.remove('active');
   const isOpen = dd.classList.toggle('show');
+  document.getElementById('btn-bookmark-list').classList.toggle('active', isOpen);
   document.getElementById('dropdown-overlay').classList.toggle('show', isOpen);
   if (isOpen) renderBookmarkDropdown();
 }
@@ -1309,7 +1373,9 @@ function toggleSettingsDropdown() {
   const dd = document.getElementById('settings-dropdown');
   const bkmDD = document.getElementById('bookmark-dropdown');
   bkmDD.classList.remove('show');
+  document.getElementById('btn-bookmark-list').classList.remove('active');
   const isOpen = dd.classList.toggle('show');
+  document.getElementById('btn-settings').classList.toggle('active', isOpen);
   document.getElementById('dropdown-overlay').classList.toggle('show', isOpen);
   if (isOpen) {
     updateSettingsControls();
@@ -1321,6 +1387,8 @@ function closeAllDropdowns() {
   document.getElementById('settings-dropdown').classList.remove('show');
   document.getElementById('bookmark-dropdown').classList.remove('show');
   document.getElementById('dropdown-overlay').classList.remove('show');
+  document.getElementById('btn-settings').classList.remove('active');
+  document.getElementById('btn-bookmark-list').classList.remove('active');
   // Stop any active shortcut recording
   stopAllRecording();
 }
