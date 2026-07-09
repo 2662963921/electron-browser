@@ -495,6 +495,20 @@ app.on('web-contents-created', (_event, contents) => {
       event.preventDefault();
       return;
     }
+    // Shift+Space → PageUp (only in webview guest, not in host URL bar).
+    // Sends a REAL PageUp key event via sendInputEvent so the browser handles
+    // scrolling naturally and page-level PageUp handlers fire correctly.
+    if (contents.getType() === 'webview' && key === ' '
+        && input.shift && !input.control && !input.alt && !input.meta) {
+      event.preventDefault();
+      setTimeout(() => {
+        try {
+          contents.sendInputEvent({ type: 'keyDown', keyCode: 'PageUp' });
+          contents.sendInputEvent({ type: 'keyUp', keyCode: 'PageUp' });
+        } catch (_) {}
+      }, 0);
+      return;
+    }
   });
 
   // Track last navigated URL for save-on-close

@@ -1009,16 +1009,9 @@ function injectSideButtonHandler() {
             return;
           }
         }, true);
-        // Shift+Space → scroll up (Electron webview sometimes doesn't forward
-        // the Shift modifier for Space, so the default scroll-up doesn't fire.)
-        document.addEventListener('keydown', function(e) {
-          if (e.key === ' ' && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
-            var tag = (e.target && e.target.tagName || '').toLowerCase();
-            if (tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable)) return;
-            e.preventDefault();
-            window.scrollBy(0, -window.innerHeight * 0.85);
-          }
-        }, true);
+        // Shift+Space → PageUp is now handled by the host's before-input-event
+        // (sends a REAL PageUp key event via sendInputEvent, which is more
+        // reliable than manual scrollBy and triggers page-level handlers).
       })();
     `);
     // Push current mouse shortcuts to the guest
