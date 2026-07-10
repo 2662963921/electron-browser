@@ -551,11 +551,12 @@ body.transparent-mode #app {
   background: var(--accent-light);
   padding: 2px 8px;
   border-radius: 10px;
-  display: none;
   pointer-events: none;
   z-index: 100;
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
-#pin-indicator.show { display: block; }
+#pin-indicator.show { opacity: 1; }
 
 /* ============================================================
    Scrollbar for Settings dropdown
@@ -734,8 +735,8 @@ body.transparent-mode #app {
   <!-- Resize Zone (bottom-right) -->
   <div id="resize-zone"></div>
 
-  <!-- Pin Indicator -->
-  <div id="pin-indicator">&#x1F4CC; 已置顶</div>
+  <!-- Pin Indicator (text set by updatePinIndicator) -->
+  <div id="pin-indicator"></div>
 
   <!-- Toast -->
   <div id="toast"></div>
@@ -1129,12 +1130,22 @@ async function updateMaxBtn(maximized) {
   btn.title = maximized ? '向下还原' : '最大化';
 }
 
+let pinTimer = null;
 function updatePinIndicator() {
   const el = document.getElementById('pin-indicator');
+  if (pinTimer) { clearTimeout(pinTimer); pinTimer = null; }
+  el.classList.remove('show');
   if (alwaysOnTop) {
+    el.textContent = '\u{1F4CC} 已置顶';
+    // Force reflow so the next class add triggers the CSS transition
+    void el.offsetWidth;
     el.classList.add('show');
+    pinTimer = setTimeout(() => el.classList.remove('show'), 3000);
   } else {
-    el.classList.remove('show');
+    el.textContent = '取消置顶';
+    void el.offsetWidth;
+    el.classList.add('show');
+    pinTimer = setTimeout(() => el.classList.remove('show'), 3000);
   }
 }
 
