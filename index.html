@@ -752,7 +752,6 @@ let webviewGuestReady = false;
 function tryInitialNavigate() {
   if (initialNavigated || !pendingInitialTarget || !webviewGuestReady) return;
   initialNavigated = true;
-  console.log('[init] Navigating to initial target:', pendingInitialTarget);
   navigateTo(pendingInitialTarget);
 }
 
@@ -820,7 +819,6 @@ async function init() {
     configLoaded = true;
     config = await api.getConfig();
     await onConfigReady();
-    console.log('[init] Fallback: config fetched via IPC');
   }, 300);
 }
 
@@ -840,7 +838,6 @@ async function onConfigReady() {
     : (config.homepage && config.homepage !== 'about:blank')
       ? config.homepage
       : 'https://www.bing.com';
-  console.log('[init] Initial target:', initialTarget);
 
   // Queue the initial navigation — did-attach/dom-ready will fire it
   pendingInitialTarget = initialTarget;
@@ -862,10 +859,15 @@ async function applyConfig() {
   applyControlsHidden();
   applyDragResizeZones();
   updatePinIndicator();
-  updateBookmarkBtn();
-  renderBookmarkDropdown();
-  renderShortcutsList();
-  updateSettingsControls();
+
+  // Defer non-critical rendering and IPC: bookmark check (currentURL is
+  // about:blank at startup), bookmark list, shortcuts, settings controls.
+  setTimeout(() => {
+    updateBookmarkBtn();
+    renderBookmarkDropdown();
+    renderShortcutsList();
+    updateSettingsControls();
+  }, 0);
 
   // Set homepage in URL bar
   if (currentURL === 'about:blank' && config.homepage) {
