@@ -109,21 +109,18 @@ let webviewId = null;
 function createWindow() {
   const winBounds = config.windowBounds || { width: 1280, height: 800 };
 
-  // ⚡ Performance: Only enable transparency if the user explicitly needs it.
-  // transparent:true disables DWM hardware composition on Windows, which
-  // adds 1-2 seconds of startup overhead. Most users don't use transparency.
-  const needsTransparent = config.controlsHidden && config.transparentBg;
-  // Pick a background color that matches the theme so the window appears
-  // painted immediately — no white flash even before the renderer loads.
-  const bgColor = config.darkMode ? '#1a1a2e' : '#f0f2f5';
-
+  // transparent is always true because the user can enable transparency via
+  // the settings checkbox at runtime, but BrowserWindow.transparent is a
+  // creation-time-only attribute — it cannot be changed after creation.
+  // backgroundColor must be transparent to match (no flash prevention with
+  // transparent windows; the trade-off is acceptable vs breaking the feature).
   mainWindow = new BrowserWindow({
     ...winBounds,
     minWidth: 400,
     minHeight: 300,
     frame: false,
-    transparent: needsTransparent,
-    backgroundColor: needsTransparent ? '#00000000' : bgColor,
+    transparent: true,
+    backgroundColor: '#00000000',
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
