@@ -48,7 +48,6 @@ const defaultConfig = {
   transparentBg: false,
   alwaysOnTop: false,
   dragAreaPercent: { width: 15, height: 8 },
-  resizeAreaPercent: { width: 8, height: 8 },
   shortcuts: {
     closeWindow:       { type: 'keyboard', key: 'F4',    ctrl: false, alt: true,  shift: false, meta: false, buttons: 0 },
     toggleDarkMode:    { type: 'keyboard', key: 'D',     ctrl: true,  alt: false, shift: false, meta: false, buttons: 0 },
@@ -368,12 +367,7 @@ function setupIPC() {
     shortcutActions.hideControls();
   });
 
-  // --- Resize ---
-  ipcMain.on('window-resize', (_event, { width, height }) => {
-    if (!mainWindow || mainWindow.isMaximized()) return;
-    const [x, y] = mainWindow.getPosition();
-    mainWindow.setBounds({ x, y, width, height });
-  });
+  // --- Resize (removed — native edge-drag on Windows works without it) ---
 
   // --- Get webview info ---
   ipcMain.handle('set-webview-id', (_event, id) => {

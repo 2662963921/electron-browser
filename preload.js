@@ -32,9 +32,6 @@ contextBridge.exposeInMainWorld('browserAPI', {
   toggleDarkMode: () => ipcRenderer.send('toggle-dark-mode'),
   toggleControlsHidden: () => ipcRenderer.send('toggle-controls-hidden'),
 
-  // --- Resize ---
-  resizeWindow: (size) => ipcRenderer.send('window-resize', size),
-
   // --- WebView Actions (forwarded) ---
   setWebviewId: (id) => ipcRenderer.invoke('set-webview-id', id),
   getErrorHTML: (info) => ipcRenderer.invoke('get-error-html', info),

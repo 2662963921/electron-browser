@@ -486,14 +486,6 @@ html, body {
 }
 #drag-zone.active { pointer-events: all; -webkit-app-region: drag; cursor: move; }
 
-#resize-zone {
-  position: fixed;
-  bottom: 0; right: 0;
-  z-index: 9999;
-  pointer-events: none;
-  transition: background var(--transition-fast);
-}
-#resize-zone.active { pointer-events: all; cursor: nwse-resize; }
 
 /* ============================================================
    Controls Hidden Mode
@@ -690,23 +682,6 @@ body.transparent-mode #app {
               </div>
             </div>
           </div>
-          <div class="settings-section">
-            <h4>缩放区域（右下角）</h4>
-            <div class="setting-row">
-              <label>宽度 %</label>
-              <div class="range-group">
-                <input type="range" id="range-resize-w" min="0" max="30" value="8" oninput="onResizeAreaChange()">
-                <span class="range-val" id="val-resize-w">8%</span>
-              </div>
-            </div>
-            <div class="setting-row">
-              <label>高度 %</label>
-              <div class="range-group">
-                <input type="range" id="range-resize-h" min="0" max="30" value="8" oninput="onResizeAreaChange()">
-                <span class="range-val" id="val-resize-h">8%</span>
-              </div>
-            </div>
-          </div>
           <!-- Config File Section -->
           <div class="settings-section">
             <h4>配置文件</h4>
@@ -732,8 +707,8 @@ body.transparent-mode #app {
   <!-- Drag Zone (top-left) -->
   <div id="drag-zone"></div>
 
-  <!-- Resize Zone (bottom-right) -->
-  <div id="resize-zone"></div>
+  <!-- Resize Zone (bottom-right) — removed, native edge-drag works on Windows -->
+
 
   <!-- Pin Indicator (text set by updatePinIndicator) -->
   <div id="pin-indicator"></div>
@@ -1515,10 +1490,6 @@ function updateSettingsControls() {
   document.getElementById('range-drag-h').value = config.dragAreaPercent.height;
   document.getElementById('val-drag-w').textContent = config.dragAreaPercent.width + '%';
   document.getElementById('val-drag-h').textContent = config.dragAreaPercent.height + '%';
-  document.getElementById('range-resize-w').value = config.resizeAreaPercent.width;
-  document.getElementById('range-resize-h').value = config.resizeAreaPercent.height;
-  document.getElementById('val-resize-w').textContent = config.resizeAreaPercent.width + '%';
-  document.getElementById('val-resize-h').textContent = config.resizeAreaPercent.height + '%';
 }
 
 async function onTransparentToggle() {
@@ -1543,29 +1514,17 @@ async function onDragAreaChange() {
   applyDragResizeZones();
 }
 
-async function onResizeAreaChange() {
-  config.resizeAreaPercent.width = parseInt(document.getElementById('range-resize-w').value);
-  config.resizeAreaPercent.height = parseInt(document.getElementById('range-resize-h').value);
-  document.getElementById('val-resize-w').textContent = config.resizeAreaPercent.width + '%';
-  document.getElementById('val-resize-h').textContent = config.resizeAreaPercent.height + '%';
-  await api.updateConfig({ resizeAreaPercent: config.resizeAreaPercent });
-  applyDragResizeZones();
-}
-
 function applyDragResizeZones() {
   const dragZone = document.getElementById('drag-zone');
-  const resizeZone = document.getElementById('resize-zone');
   const w = window.innerWidth;
   const h = window.innerHeight;
 
-  // Only activate drag/resize zones when in frameless mode (controls hidden)
+  // Only activate drag zone when in frameless mode (controls hidden).
+  // Resize zone removed — native edge-drag on Windows works without it.
   if (!controlsHidden) {
     dragZone.style.width = '0';
     dragZone.style.height = '0';
     dragZone.classList.remove('active');
-    resizeZone.style.width = '0';
-    resizeZone.style.height = '0';
-    resizeZone.classList.remove('active');
     return;
   }
 
@@ -1583,22 +1542,6 @@ function applyDragResizeZones() {
     dragZone.style.width = '0';
     dragZone.style.height = '0';
     dragZone.classList.remove('active');
-  }
-
-  // Resize zone: bottom-right corner of the window (over webview)
-  const resizePct = config.resizeAreaPercent || { width: 8, height: 8 };
-  const resizeW = Math.round(w * resizePct.width / 100);
-  const resizeH = Math.round(h * resizePct.height / 100);
-  if (resizeW > 0 && resizeH > 0) {
-    resizeZone.style.bottom = '0';
-    resizeZone.style.right = '0';
-    resizeZone.style.width = resizeW + 'px';
-    resizeZone.style.height = resizeH + 'px';
-    resizeZone.classList.add('active');
-  } else {
-    resizeZone.style.width = '0';
-    resizeZone.style.height = '0';
-    resizeZone.classList.remove('active');
   }
 }
 
@@ -1867,8 +1810,7 @@ function isOnWebview(target) {
     !target.closest('#titlebar') &&
     !target.closest('#settings-dropdown') &&
     !target.closest('#bookmark-dropdown') &&
-    !target.closest('#drag-zone') &&
-    !target.closest('#resize-zone');
+    !target.closest('#drag-zone');
 }
 
 function checkMouseShortcuts(buttons, ctrlKey, altKey, shiftKey, metaKey) {
@@ -1911,35 +1853,6 @@ function sleep(ms) {
 
 // ============================================================
 //  Resize Zone (manual window resize)
-// ============================================================
-
-let isResizing = false;
-let resizeStartX = 0, resizeStartY = 0;
-let resizeStartW = 0, resizeStartH = 0;
-
-document.getElementById('resize-zone').addEventListener('mousedown', (e) => {
-  if (e.button !== 0) return; // Left button only
-  isResizing = true;
-  resizeStartX = e.screenX;
-  resizeStartY = e.screenY;
-  resizeStartW = window.innerWidth;
-  resizeStartH = window.innerHeight;
-  e.preventDefault();
-});
-
-document.addEventListener('mousemove', (e) => {
-  if (!isResizing) return;
-  const dx = e.screenX - resizeStartX;
-  const dy = e.screenY - resizeStartY;
-  const newW = Math.max(400, resizeStartW + dx);
-  const newH = Math.max(300, resizeStartH + dy);
-  api.resizeWindow({ width: newW, height: newH });
-});
-
-document.addEventListener('mouseup', () => {
-  isResizing = false;
-});
-
 // ============================================================
 //  Window Resize Handler (update zones)
 // ============================================================
