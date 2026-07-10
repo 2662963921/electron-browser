@@ -116,7 +116,7 @@ function createWindow() {
   // transparent windows; the trade-off is acceptable vs breaking the feature).
   mainWindow = new BrowserWindow({
     ...winBounds,
-    minWidth: 400,
+    minWidth: 200,
     minHeight: 300,
     frame: false,
     transparent: true,
