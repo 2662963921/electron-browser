@@ -293,6 +293,11 @@ function setupIPC() {
     return config;
   });
 
+  ipcMain.handle('open-config-folder', () => {
+    const cfgPath = getConfigPath();
+    shell.showItemInFolder(cfgPath);
+  });
+
   // --- Window Controls ---
   ipcMain.on('window-minimize', () => mainWindow && mainWindow.minimize());
   ipcMain.on('window-maximize', () => {

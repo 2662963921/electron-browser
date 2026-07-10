@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('browserAPI', {
   // --- Config ---
   getConfig: () => ipcRenderer.invoke('get-config'),
   updateConfig: (updates) => ipcRenderer.invoke('update-config', updates),
+  openConfigFolder: () => ipcRenderer.invoke('open-config-folder'),
 
   // --- Window Controls ---
   minimizeWindow: () => ipcRenderer.send('window-minimize'),

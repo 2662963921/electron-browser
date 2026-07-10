@@ -333,6 +333,17 @@ html, body {
   margin-bottom: 10px;
   letter-spacing: 0.5px;
 }
+.settings-section .config-btn {
+  width: 100%;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 12px;
+  text-align: center;
+}
 
 /* Shortcut Item */
 .shortcut-item {
@@ -693,6 +704,13 @@ body.transparent-mode #app {
                 <input type="range" id="range-resize-h" min="0" max="30" value="8" oninput="onResizeAreaChange()">
                 <span class="range-val" id="val-resize-h">8%</span>
               </div>
+            </div>
+          </div>
+          <!-- Config File Section -->
+          <div class="settings-section">
+            <h4>配置文件</h4>
+            <div class="setting-row">
+              <button class="config-btn" onclick="api.openConfigFolder()">📂 打开配置文件目录</button>
             </div>
           </div>
         </div>
