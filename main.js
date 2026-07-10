@@ -403,14 +403,29 @@ function setupIPC() {
   });
 }
 
-// --- DevTools shortcut handling ──────────────────────────────
+// --- DevTools & Shift+Space shortcut handling ─────────────────
 // F12 toggle and Ctrl+Shift+I blocking are handled via before-input-event
 // (fires BEFORE Chromium processes the key, so preventDefault can block
 // Chromium's built-in shortcuts). globalShortcut is NOT used for F12 because
 // globalShortcut.register('F12') can silently fail, and before-input-event's
 // preventDefault would then block the built-in F12 too — leaving F12 dead.
+//
+// Shift+Space is handled via globalShortcut because input method editors (IME)
+// on Chinese Windows (e.g., Microsoft Pinyin) intercept Shift+Space at the
+// system level before before-input-event can fire. globalShortcut registers
+// at the OS level (RegisterHotKey), which fires before the IME.
 function registerDevToolsShortcuts() {
-  // Intentionally empty — F12 handled via before-input-event.
+  // Shift+Space → PageUp (via globalShortcut to bypass IME interception)
+  try {
+    globalShortcut.register('Shift+Space', () => {
+      if (mainWindow && mainWindow.isFocused() && webviewContents && !webviewContents.isDestroyed()) {
+        try {
+          webviewContents.sendInputEvent({ type: 'keyDown', keyCode: 'PageUp' });
+          webviewContents.sendInputEvent({ type: 'keyUp', keyCode: 'PageUp' });
+        } catch (_) {}
+      }
+    });
+  } catch (_) {}
 }
 
 function escapeHTML(str) {
@@ -486,14 +501,14 @@ app.on('web-contents-created', (_event, contents) => {
     webviewContents = contents;
   }
 
-  // ── before-input-event: intercept keys BEFORE Chromium processes them ──
-  // • F12            → toggle 工具箱 (open if closed, close if open)
-  // • Ctrl+Shift+I   → block entirely
-  // • Shift+Space    → sendInputEvent PageUp (with DevTools console logging for debugging)
+  // ── before-input-event: intercept Chromium's built-in shortcuts ──
+  // F12 is handled here (toggle); Shift+Space is handled by globalShortcut
+  // (bypasses IME interception — see registerDevToolsShortcuts).
   contents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown') return;
     const key = input.key;
-    // F12 → toggle 工具箱 (app shell DevTools)
+
+    // F12 → toggle 工具箱 (always preventDefault + setTimeout to avoid re-entrancy)
     if (key === 'F12') {
       event.preventDefault();
       setTimeout(() => {
@@ -510,34 +525,17 @@ app.on('web-contents-created', (_event, contents) => {
       }, 0);
       return;
     }
+
     // Block Chromium's built-in Ctrl+Shift+I
     if (key && key.toLowerCase() === 'i' && input.control && input.shift) {
       event.preventDefault();
-      return;
-    }
-    // Shift+Space → sendInputEvent PageUp (with logging)
-    if (contents.getType() === 'webview' && input.shift && !input.control && !input.alt && !input.meta
-        && (key === ' ' || (input.code && input.code === 'Space'))) {
-      event.preventDefault();
-      // Log to DevTools console (工具箱)
-      const dtLog = (msg) => {
-        try { mainWindow.webContents.executeJavaScript('console.log(' + JSON.stringify('[Shift+Space] ' + msg) + ')'); } catch (_) {}
-      };
-      dtLog('detected: key=' + JSON.stringify(key) + ' code=' + JSON.stringify(input.code) + ' shift=' + input.shift);
-      try {
-        contents.sendInputEvent({ type: 'keyDown', keyCode: 'PageUp' });
-        contents.sendInputEvent({ type: 'keyUp', keyCode: 'PageUp' });
-        dtLog('sendInputEvent PageUp sent (keyDown+keyUp)');
-      } catch (e) {
-        dtLog('sendInputEvent FAILED: ' + (e && e.message || e));
-      }
       return;
     }
   });
 
   // Track last navigated URL for save-on-close
   contents.on('did-navigate', (_e, url) => {
-    if (url && url !== 'about:blank' && !url.startsWith('data:')) {
+    if (url && url !== 'about:blank' && !url.startsWith('data:') && !url.startsWith('devtools:')) {
       trackedLastURL = url;
     }
   });
