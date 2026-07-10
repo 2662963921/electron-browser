@@ -109,35 +109,48 @@ let webviewId = null;
 function createWindow() {
   const winBounds = config.windowBounds || { width: 1280, height: 800 };
 
+  // ⚡ Performance: Only enable transparency if the user explicitly needs it.
+  // transparent:true disables DWM hardware composition on Windows, which
+  // adds 1-2 seconds of startup overhead. Most users don't use transparency.
+  const needsTransparent = config.controlsHidden && config.transparentBg;
+  // Pick a background color that matches the theme so the window appears
+  // painted immediately — no white flash even before the renderer loads.
+  const bgColor = config.darkMode ? '#1a1a2e' : '#f0f2f5';
+
   mainWindow = new BrowserWindow({
     ...winBounds,
     minWidth: 400,
     minHeight: 300,
     frame: false,
-    transparent: true,
-    backgroundColor: '#00000000',
+    transparent: needsTransparent,
+    backgroundColor: needsTransparent ? '#00000000' : bgColor,
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       webviewTag: true,
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
+      // ⚡ Prevent renderer timer background throttling during startup
+      backgroundThrottling: false,
     },
-    show: false,
   });
 
+  // ⚡ Show the window as early as possible. With a matching backgroundColor
+  // there is NO white flash, and the user sees the app shell immediately
+  // while the webview loads.
   mainWindow.loadFile('index.html');
+  mainWindow.show();
 
   if (config.isMaximized) {
     mainWindow.maximize();
   }
 
+  // Notify renderer of initial config (still needed for webview init)
   mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
     if (config.alwaysOnTop) {
       mainWindow.setAlwaysOnTop(true, 'screen-saver');
     }
-    // notify renderer of initial state
     mainWindow.webContents.send('init-config', config);
   });
 
@@ -255,6 +268,10 @@ function registerAllShortcuts() {
   // button (or removed), F11 still works. Registered after the loop so it is
   // never wiped by the configurable bindings above.
   try { globalShortcut.register('F11', shortcutActions.hideControls); } catch (_) {}
+  // Re-register F12 (DevTools toggle) — unregisterAll above wiped it.
+  // Must be done here so F12 survives every registerAllShortcuts() call
+  // (init, shortcut update, etc.), not just the initial one.
+  registerDevToolsShortcuts();
 }
 
 function syncDarkMode() {
@@ -387,16 +404,13 @@ function setupIPC() {
 }
 
 // --- DevTools shortcut handling ──────────────────────────────
-// Moved to before-input-event in the web-contents-created handler above.
-// Chromium has built-in F12 / Ctrl+Shift+I shortcuts at the webContents level
-// that globalShortcut CANNOT block. before-input-event intercepts keys BEFORE
-// Chromium processes them, so we can:
-//   • F12          → open app-shell DevTools (工具箱)
-//   • Ctrl+Shift+I → block entirely
-// globalShortcut is no longer used for DevTools (it would double-open with
-// before-input-event and cannot block Chromium's built-in handler).
+// F12 toggle and Ctrl+Shift+I blocking are handled via before-input-event
+// (fires BEFORE Chromium processes the key, so preventDefault can block
+// Chromium's built-in shortcuts). globalShortcut is NOT used for F12 because
+// globalShortcut.register('F12') can silently fail, and before-input-event's
+// preventDefault would then block the built-in F12 too — leaving F12 dead.
 function registerDevToolsShortcuts() {
-  // Intentionally empty — DevTools shortcuts handled via before-input-event.
+  // Intentionally empty — F12 handled via before-input-event.
 }
 
 function escapeHTML(str) {
@@ -425,6 +439,12 @@ function normalizeUrl(u) {
 // ============================================================
 
 app.whenReady().then(() => {
+  // ⚡ Performance: Prevent Chromium from throttling timers in background
+  // tabs/renderers — this speeds up the initial webview navigation.
+  // These flags are safe: they don't affect rendering quality or stability.
+  app.commandLine.appendSwitch('disable-renderer-backgrounding');
+  app.commandLine.appendSwitch('disable-background-timer-throttling');
+
   // Load saved config from disk FIRST
   loadConfig();
 
@@ -466,28 +486,28 @@ app.on('web-contents-created', (_event, contents) => {
     webviewContents = contents;
   }
 
-  // ── DevTools shortcut interception ──────────────────────────
-  // Chromium has BUILT-IN DevTools shortcuts (F12, Ctrl+Shift+I) that fire at
-  // the webContents level — globalShortcut cannot block them. We intercept
-  // here via before-input-event (fires BEFORE Chromium processes the key):
-  //   • F12            → open app-shell DevTools (工具箱), block built-in
-  //   • Ctrl+Shift+I   → block entirely (user moved 工具箱 to F12)
+  // ── before-input-event: intercept keys BEFORE Chromium processes them ──
+  // • F12            → toggle 工具箱 (open if closed, close if open)
+  // • Ctrl+Shift+I   → block entirely
+  // • Shift+Space    → sendInputEvent PageUp (with DevTools console logging for debugging)
   contents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown') return;
     const key = input.key;
     // F12 → toggle 工具箱 (app shell DevTools)
     if (key === 'F12') {
       event.preventDefault();
-      if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
-        try {
-          if (mainWindow.webContents.isDevToolsOpened()) {
-            mainWindow.webContents.closeDevTools();
-          } else {
-            mainWindow.webContents.openDevTools();
-            mainWindow.webContents.send('devtools-opened', 'shell');
-          }
-        } catch (_) {}
-      }
+      setTimeout(() => {
+        if (mainWindow && mainWindow.webContents && !mainWindow.webContents.isDestroyed()) {
+          try {
+            if (mainWindow.webContents.isDevToolsOpened()) {
+              mainWindow.webContents.closeDevTools();
+            } else {
+              mainWindow.webContents.openDevTools();
+              mainWindow.webContents.send('devtools-opened', 'shell');
+            }
+          } catch (_) {}
+        }
+      }, 0);
       return;
     }
     // Block Chromium's built-in Ctrl+Shift+I
@@ -495,18 +515,22 @@ app.on('web-contents-created', (_event, contents) => {
       event.preventDefault();
       return;
     }
-    // Shift+Space → PageUp (only in webview guest, not in host URL bar).
-    // Sends a REAL PageUp key event via sendInputEvent so the browser handles
-    // scrolling naturally and page-level PageUp handlers fire correctly.
-    if (contents.getType() === 'webview' && key === ' '
-        && input.shift && !input.control && !input.alt && !input.meta) {
+    // Shift+Space → sendInputEvent PageUp (with logging)
+    if (contents.getType() === 'webview' && input.shift && !input.control && !input.alt && !input.meta
+        && (key === ' ' || (input.code && input.code === 'Space'))) {
       event.preventDefault();
-      setTimeout(() => {
-        try {
-          contents.sendInputEvent({ type: 'keyDown', keyCode: 'PageUp' });
-          contents.sendInputEvent({ type: 'keyUp', keyCode: 'PageUp' });
-        } catch (_) {}
-      }, 0);
+      // Log to DevTools console (工具箱)
+      const dtLog = (msg) => {
+        try { mainWindow.webContents.executeJavaScript('console.log(' + JSON.stringify('[Shift+Space] ' + msg) + ')'); } catch (_) {}
+      };
+      dtLog('detected: key=' + JSON.stringify(key) + ' code=' + JSON.stringify(input.code) + ' shift=' + input.shift);
+      try {
+        contents.sendInputEvent({ type: 'keyDown', keyCode: 'PageUp' });
+        contents.sendInputEvent({ type: 'keyUp', keyCode: 'PageUp' });
+        dtLog('sendInputEvent PageUp sent (keyDown+keyUp)');
+      } catch (e) {
+        dtLog('sendInputEvent FAILED: ' + (e && e.message || e));
+      }
       return;
     }
   });

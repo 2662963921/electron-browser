@@ -770,14 +770,19 @@ const shortcutLabels = {
 
 async function init() {
   // Register webview listeners synchronously FIRST — before any await —
-  // otherwise we miss the guest's did-attach / dom-ready events. That was the
-  // root cause of the "URL bar shows Bing but page is blank until you click →" bug.
+  // otherwise we miss the guest's did-attach / dom-ready events.
   setupWebview();
 
-  // Listen for IPC events
+  // ⚡ Config arrives via init-config event (from main process ready-to-show).
+  // No need for a separate api.getConfig() IPC round-trip here — avoid the
+  // duplicate config loading that was slowing startup.
+  let configLoaded = false;
+
   api.onInitConfig(async (cfg) => {
+    if (configLoaded) return; // already handled below
+    configLoaded = true;
     config = cfg;
-    await applyConfig();
+    await onConfigReady();
   });
 
   api.onDarkModeChanged(async (dark) => {
@@ -804,13 +809,23 @@ async function init() {
     navigateTo(url);
   });
 
-  // DevTools open feedback (F12 = 工具箱 / app shell)
   api.onDevToolsOpened((target) => {
     if (target === 'shell') showToast('已打开【工具箱】开发者工具 — 按 F12 关闭');
   });
 
-  // Get initial state
-  config = await api.getConfig();
+  // ⚡ Fallback: config still arrives quickly via init-config, but if it
+  // somehow doesn't, use a direct IPC fetch as safety net.
+  setTimeout(async () => {
+    if (configLoaded) return;
+    configLoaded = true;
+    config = await api.getConfig();
+    await onConfigReady();
+    console.log('[init] Fallback: config fetched via IPC');
+  }, 300);
+}
+
+/** Handles initial config application and navigation startup. */
+async function onConfigReady() {
   bookmarks = config.bookmarks || [];
   shortcuts = config.shortcuts || {};
   darkMode = config.darkMode;
@@ -827,15 +842,13 @@ async function init() {
       : 'https://www.bing.com';
   console.log('[init] Initial target:', initialTarget);
 
-  // Queue the initial navigation. setupWebview's did-attach / dom-ready handlers
-  // will fire it as soon as the webview guest is ready. If the guest is already
-  // ready, tryInitialNavigate() navigates immediately.
+  // Queue the initial navigation — did-attach/dom-ready will fire it
   pendingInitialTarget = initialTarget;
   tryInitialNavigate();
 
-  // Belt-and-suspenders: if the guest is somehow still not ready, force readiness
-  // and retry the navigation after 2s.
-  setTimeout(() => { webviewGuestReady = true; tryInitialNavigate(); }, 2000);
+  // ⚡ Reduced fallback: 500ms instead of 2000ms.
+  // did-attach typically fires within 50-100ms of webview creation.
+  setTimeout(() => { webviewGuestReady = true; tryInitialNavigate(); }, 500);
 }
 
 async function applyConfig() {
@@ -1009,9 +1022,14 @@ function injectSideButtonHandler() {
             return;
           }
         }, true);
-        // Shift+Space → PageUp is now handled by the host's before-input-event
-        // (sends a REAL PageUp key event via sendInputEvent, which is more
-        // reliable than manual scrollBy and triggers page-level handlers).
+        // Debug: log if a PageUp keydown arrives in the guest (via sendInputEvent
+        // from the host's before-input-event handler). Picked up by the host's
+        // console-message listener and forwarded to the DevTools console.
+        document.addEventListener('keydown', function(e) {
+          if (e.key === 'PageUp' || e.code === 'PageUp') {
+            console.log('__wb_pgup: PageUp keydown RECEIVED in guest (key=' + e.key + ' code=' + e.code + ')');
+          }
+        }, true);
       })();
     `);
     // Push current mouse shortcuts to the guest
@@ -1163,6 +1181,10 @@ function setupWebview() {
     if (e.message && e.message.startsWith('__wb_action__:')) {
       const action = e.message.substring('__wb_action__:'.length);
       executeAction(action);
+    }
+    // Forward debug logs (PageUp etc.) to the host's DevTools console
+    if (e.message && e.message.startsWith('__wb_pgup')) {
+      console.log('[guest] ' + e.message);
     }
   });
 
