@@ -469,7 +469,7 @@ html, body {
   height: 100%;
   border: none;
 }
-#webview-container webview::shadow ::-webkit-scrollbar {
+#webview-container webview::-webkit-scrollbar {
   display: none;
 }
 
@@ -874,11 +874,37 @@ function applyTheme() {
   syncWebviewDarkMode();
 }
 
+// Track the injected scrollbar-hiding CSS key so we can remove it when
+// exiting frameless mode (controlsHidden → false).
+let hideScrollbarCSSKey = null;
+
+function injectHideScrollbarCSS() {
+  try {
+    if (webview && webview.insertCSS) {
+      // If already injected, skip (key is non-null)
+      if (hideScrollbarCSSKey) return;
+      webview.insertCSS('::-webkit-scrollbar { display: none !important; }')
+        .then((key) => { hideScrollbarCSSKey = key; })
+        .catch(() => {});
+    }
+  } catch (_) {}
+}
+function removeScrollbarCSS() {
+  try {
+    if (hideScrollbarCSSKey && webview && webview.removeCSS) {
+      webview.removeCSS(hideScrollbarCSSKey).catch(() => {});
+      hideScrollbarCSSKey = null;
+    }
+  } catch (_) {}
+}
+
 async function applyControlsHidden() {
   if (controlsHidden) {
     document.body.classList.add('controls-hidden');
+    injectHideScrollbarCSS();
   } else {
     document.body.classList.remove('controls-hidden');
+    removeScrollbarCSS();
   }
   updateTransparentMode();
 }
