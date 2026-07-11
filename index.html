@@ -1908,6 +1908,15 @@ window.addEventListener('resize', () => {
   applyDragResizeZones();
 });
 
+// --- Toolbar horizontal scroll via mouse wheel ---
+document.getElementById('toolbar-inner').addEventListener('wheel', (e) => {
+  // Only intercept if the toolbar content overflows (has scrollable content)
+  const el = e.currentTarget;
+  if (el.scrollWidth <= el.clientWidth) return;
+  e.preventDefault();
+  el.scrollLeft += e.deltaY;
+}, { passive: false });
+
 // ============================================================
 //  URL Bar Enter Key
 // ============================================================
