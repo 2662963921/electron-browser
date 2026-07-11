@@ -146,6 +146,7 @@ html, body {
 #toolbar.hidden {
   height: 0; opacity: 0; padding: 0; margin: 0; overflow: hidden; border: none;
 }
+/* Auto-hiding scrollbar: hidden by default, fades in while scrolling */
 #toolbar-inner {
   display: flex;
   align-items: center;
@@ -156,7 +157,6 @@ html, body {
   overflow-y: hidden;
   scrollbar-width: thin;
 }
-/* Thin auto-hiding scrollbar for the toolbar */
 #toolbar-inner::-webkit-scrollbar {
   height: 4px;
 }
@@ -166,6 +166,11 @@ html, body {
 #toolbar-inner::-webkit-scrollbar-thumb {
   background: var(--text-muted);
   border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+#toolbar-inner.show-scrollbar::-webkit-scrollbar-thumb {
+  opacity: 1;
 }
 
 /* Toolbar Buttons */
@@ -1914,7 +1919,7 @@ document.getElementById('toolbar-inner').addEventListener('wheel', (e) => {
   const el = e.currentTarget;
   if (el.scrollWidth <= el.clientWidth) return;
   e.preventDefault();
-  el.scrollLeft += e.deltaY;
+  el.scrollBy({ left: e.deltaY, behavior: 'smooth' });
 }, { passive: false });
 
 // ============================================================
