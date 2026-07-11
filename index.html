@@ -146,7 +146,7 @@ html, body {
 #toolbar.hidden {
   height: 0; opacity: 0; padding: 0; margin: 0; overflow: hidden; border: none;
 }
-/* Auto-hiding scrollbar: hidden by default, fades in while scrolling */
+/* Auto-hiding scrollbar: native scrollbar hidden, custom overlay used */
 #toolbar-inner {
   display: flex;
   align-items: center;
@@ -155,22 +155,30 @@ html, body {
   gap: 4px;
   overflow-x: auto;
   overflow-y: hidden;
-  scrollbar-width: thin;
+  scrollbar-width: none; /* Firefox */
 }
 #toolbar-inner::-webkit-scrollbar {
+  display: none; /* Chromium */
+}
+/* Custom scrollbar overlay */
+#toolbar-scrollbar {
+  position: relative;
   height: 4px;
-}
-#toolbar-inner::-webkit-scrollbar-track {
+  flex-shrink: 0;
   background: transparent;
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
-#toolbar-inner::-webkit-scrollbar-thumb {
+#toolbar-scrollbar.visible {
+  opacity: 1;
+}
+#toolbar-scrollbar-thumb {
+  position: absolute;
+  top: 0;
+  height: 4px;
   background: var(--text-muted);
   border-radius: 2px;
-  opacity: 0;
-  transition: opacity 0.4s ease;
-}
-#toolbar-inner.show-scrollbar::-webkit-scrollbar-thumb {
-  opacity: 1;
+  transition: left 0.1s ease, width 0.1s ease;
 }
 
 /* Toolbar Buttons */
@@ -717,6 +725,7 @@ body.transparent-mode #app {
         </div>
       </div>
       </div>
+      <div id="toolbar-scrollbar"><div id="toolbar-scrollbar-thumb"></div></div>
     </div>
 
     <!-- WebView Container -->
@@ -1913,14 +1922,48 @@ window.addEventListener('resize', () => {
   applyDragResizeZones();
 });
 
-// --- Toolbar horizontal scroll via mouse wheel ---
-document.getElementById('toolbar-inner').addEventListener('wheel', (e) => {
-  // Only intercept if the toolbar content overflows (has scrollable content)
-  const el = e.currentTarget;
-  if (el.scrollWidth <= el.clientWidth) return;
-  e.preventDefault();
-  el.scrollBy({ left: e.deltaY, behavior: 'smooth' });
-}, { passive: false });
+// --- Toolbar custom scrollbar (auto-hide with fade) ---
+(function() {
+  const inner = document.getElementById('toolbar-inner');
+  const sb = document.getElementById('toolbar-scrollbar');
+  const thumb = document.getElementById('toolbar-scrollbar-thumb');
+  let hideTimer = null;
+
+  function updateThumb() {
+    const ratio = inner.scrollLeft / (inner.scrollWidth - inner.clientWidth || 1);
+    const thumbW = Math.max(20, (inner.clientWidth / inner.scrollWidth) * inner.clientWidth);
+    thumb.style.width = thumbW + 'px';
+    thumb.style.left = (ratio * (inner.clientWidth - thumbW)) + 'px';
+  }
+
+  function showBar() {
+    if (inner.scrollWidth <= inner.clientWidth) return;
+    updateThumb();
+    sb.classList.add('visible');
+    if (hideTimer) clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => sb.classList.remove('visible'), 1500);
+  }
+
+  // Wheel → horizontal scroll
+  inner.addEventListener('wheel', (e) => {
+    if (inner.scrollWidth <= inner.clientWidth) return;
+    e.preventDefault();
+    inner.scrollBy({ left: e.deltaY, behavior: 'smooth' });
+  }, { passive: false });
+
+  // Scroll → update thumb position + show
+  inner.addEventListener('scroll', showBar);
+
+  // Mouse enters scrollbar area → show
+  sb.addEventListener('mouseenter', () => {
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    sb.classList.add('visible');
+  });
+  sb.addEventListener('mouseleave', showBar);
+
+  // Window resize → update thumb
+  window.addEventListener('resize', updateThumb);
+})();
 
 // ============================================================
 //  URL Bar Enter Key
