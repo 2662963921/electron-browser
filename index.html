@@ -1941,14 +1941,30 @@ window.addEventListener('resize', () => {
     updateThumb();
     sb.classList.add('visible');
     if (hideTimer) clearTimeout(hideTimer);
-    hideTimer = setTimeout(() => sb.classList.remove('visible'), 1500);
+    hideTimer = setTimeout(() => sb.classList.remove('visible'), 750);
   }
 
-  // Wheel → horizontal scroll
+  // Wheel → accumulate target, animate via rAF (smooth, no jank)
+  let targetScroll = inner.scrollLeft;
+  let rafId = null;
+  function animate() {
+    const diff = targetScroll - inner.scrollLeft;
+    if (Math.abs(diff) < 0.5) {
+      inner.scrollLeft = targetScroll;
+      rafId = null;
+      return;
+    }
+    // Move 1/4 of remaining distance per frame for natural easing
+    inner.scrollLeft += diff * 0.25;
+    rafId = requestAnimationFrame(animate);
+  }
   inner.addEventListener('wheel', (e) => {
     if (inner.scrollWidth <= inner.clientWidth) return;
     e.preventDefault();
-    inner.scrollBy({ left: e.deltaY, behavior: 'smooth' });
+    targetScroll += e.deltaY / 2;
+    const max = inner.scrollWidth - inner.clientWidth;
+    targetScroll = Math.max(0, Math.min(max, targetScroll));
+    if (!rafId) rafId = requestAnimationFrame(animate);
   }, { passive: false });
 
   // Scroll → update thumb position + show
