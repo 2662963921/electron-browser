@@ -751,10 +751,10 @@ function tryInitialNavigate() {
 
 // Shortcut action labels
 const shortcutLabels = {
-  closeWindow: '关闭窗口',
-  toggleDarkMode: '切换夜间/日间模式',
-  hideControls: '隐藏/显示控件',
-  toggleAlwaysOnTop: '置顶/取消置顶',
+  closeWindow: '关闭窗口（Ctrl+W）',
+  toggleDarkMode: '切换夜间/日间模式（Ctrl+D）',
+  hideControls: '隐藏/显示控件（F11）',
+  toggleAlwaysOnTop: '置顶/取消置顶（Ctrl+T）',
 };
 
 // ============================================================
@@ -1583,10 +1583,10 @@ function renderShortcutsList() {
       e.stopPropagation();
       const name = e.target.dataset.action;
       const defaults = {
-        closeWindow:       { type: 'keyboard', key: 'F4',    ctrl: false, alt: true,  shift: false, meta: false, buttons: 0 },
+        closeWindow:       { type: 'keyboard', key: 'W',     ctrl: true,  alt: false, shift: false, meta: false, buttons: 0 },
         toggleDarkMode:    { type: 'keyboard', key: 'D',     ctrl: true,  alt: false, shift: false, meta: false, buttons: 0 },
         hideControls:      { type: 'keyboard', key: 'F11',   ctrl: false, alt: false, shift: false, meta: false, buttons: 0 },
-        toggleAlwaysOnTop: { type: 'keyboard', key: 'T',     ctrl: true,  alt: false, shift: true,  meta: false, buttons: 0 },
+        toggleAlwaysOnTop: { type: 'keyboard', key: 'T',     ctrl: true,  alt: false, shift: false, meta: false, buttons: 0 },
       };
       shortcuts[name] = defaults[name];
       await api.updateShortcut(name, shortcuts[name]);

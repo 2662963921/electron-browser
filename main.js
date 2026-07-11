@@ -49,10 +49,10 @@ const defaultConfig = {
   alwaysOnTop: false,
   dragAreaPercent: { width: 15, height: 8 },
   shortcuts: {
-    closeWindow:       { type: 'keyboard', key: 'F4',    ctrl: false, alt: true,  shift: false, meta: false, buttons: 0 },
+    closeWindow:       { type: 'keyboard', key: 'W',     ctrl: true,  alt: false, shift: false, meta: false, buttons: 0 },
     toggleDarkMode:    { type: 'keyboard', key: 'D',     ctrl: true,  alt: false, shift: false, meta: false, buttons: 0 },
     hideControls:      { type: 'keyboard', key: 'F11',   ctrl: false, alt: false, shift: false, meta: false, buttons: 0 },
-    toggleAlwaysOnTop: { type: 'keyboard', key: 'T',     ctrl: true,  alt: false, shift: true,  meta: false, buttons: 0 },
+    toggleAlwaysOnTop: { type: 'keyboard', key: 'T',     ctrl: true,  alt: false, shift: false, meta: false, buttons: 0 },
   },
 };
 
@@ -215,23 +215,36 @@ function killExistingWebviewProcesses() {
 //  Shortcut Management
 // ============================================================
 
+// Anti-duplicate guard: if both a user-defined shortcut and its default fire
+// within 500ms (e.g. user changed Ctrl+W to something else but Ctrl+W still
+// works as the default), only the first call executes the action.
+const actionGuard = {};
+function guard(name, fn) {
+  return () => {
+    const now = Date.now();
+    if (actionGuard[name] && now - actionGuard[name] < 500) return;
+    actionGuard[name] = now;
+    fn();
+  };
+}
+
 const shortcutActions = {
-  closeWindow:       () => { if (mainWindow) mainWindow.close(); },
-  toggleDarkMode:    () => {
+  closeWindow:       guard('closeWindow',       () => { if (mainWindow) mainWindow.close(); }),
+  toggleDarkMode:    guard('toggleDarkMode',    () => {
     config.darkMode = !config.darkMode;
     nativeTheme.themeSource = config.darkMode ? 'dark' : 'light';
     saveConfig(config);
     syncDarkMode();
-  },
-  hideControls:      () => { config.controlsHidden = !config.controlsHidden; saveConfig(config); syncControlsHidden(); },
-  toggleAlwaysOnTop: () => {
+  }),
+  hideControls:      guard('hideControls',      () => { config.controlsHidden = !config.controlsHidden; saveConfig(config); syncControlsHidden(); }),
+  toggleAlwaysOnTop: guard('toggleAlwaysOnTop', () => {
     config.alwaysOnTop = !config.alwaysOnTop;
     saveConfig(config);
     if (mainWindow) {
       mainWindow.setAlwaysOnTop(config.alwaysOnTop, 'screen-saver');
       mainWindow.webContents.send('always-on-top-changed', config.alwaysOnTop);
     }
-  },
+  }),
 };
 
 function buildAccelerator(shortcut) {
@@ -259,11 +272,14 @@ function registerAllShortcuts() {
       }
     }
   }
-  // F11 ALWAYS toggles frameless (hide controls), independent of the user's
-  // configurable shortcut. So even if "hide controls" is rebound to a mouse
-  // button (or removed), F11 still works. Registered after the loop so it is
-  // never wiped by the configurable bindings above.
+  // Default shortcuts that ALWAYS work — even if the user rebinds the action
+  // to something else, the original shortcut still does its job. Registered
+  // after the loop so they survive unregisterAll().
+  // F11 is already registered below. Ctrl+W/Ctrl+D/Ctrl+T added here.
   try { globalShortcut.register('F11', shortcutActions.hideControls); } catch (_) {}
+  try { globalShortcut.register('CommandOrControl+W', shortcutActions.closeWindow); } catch (_) {}
+  try { globalShortcut.register('CommandOrControl+D', shortcutActions.toggleDarkMode); } catch (_) {}
+  try { globalShortcut.register('CommandOrControl+T', shortcutActions.toggleAlwaysOnTop); } catch (_) {}
   // Re-register F12 (DevTools toggle) — unregisterAll above wiped it.
   // Must be done here so F12 survives every registerAllShortcuts() call
   // (init, shortcut update, etc.), not just the initial one.
