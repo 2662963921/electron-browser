@@ -687,6 +687,13 @@ body.transparent-mode #app {
               <label for="chk-transparent">软件背景全透明（无边框）</label>
               <input type="checkbox" id="chk-transparent" onchange="onTransparentToggle()">
             </div>
+            <div class="setting-row">
+              <label>窗口透明度</label>
+              <div class="range-group">
+                <input type="range" id="range-opacity" min="10" max="100" value="100" oninput="onWindowOpacityChange()">
+                <span class="range-val" id="val-opacity">100%</span>
+              </div>
+            </div>
           </div>
           <!-- Restore last URL Section -->
           <div class="settings-section">
@@ -1591,6 +1598,16 @@ function updateSettingsControls() {
   document.getElementById('range-drag-h').value = config.dragAreaPercent.height;
   document.getElementById('val-drag-w').textContent = config.dragAreaPercent.width + '%';
   document.getElementById('val-drag-h').textContent = config.dragAreaPercent.height + '%';
+  const op = config.windowOpacity !== undefined ? config.windowOpacity : 100;
+  document.getElementById('range-opacity').value = op;
+  document.getElementById('val-opacity').textContent = op + '%';
+}
+
+async function onWindowOpacityChange() {
+  const val = parseInt(document.getElementById('range-opacity').value);
+  document.getElementById('val-opacity').textContent = val + '%';
+  config.windowOpacity = val;
+  await api.updateConfig({ windowOpacity: val });
 }
 
 async function onTransparentToggle() {

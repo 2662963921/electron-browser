@@ -46,6 +46,7 @@ const defaultConfig = {
   bookmarks: [],
   controlsHidden: false,
   transparentBg: false,
+  windowOpacity: 100,
   alwaysOnTop: false,
   dragAreaPercent: { width: 15, height: 8 },
   shortcuts: {
@@ -294,6 +295,12 @@ function syncControlsHidden() {
   if (mainWindow) mainWindow.webContents.send('controls-hidden-changed', config.controlsHidden);
 }
 
+function applyWindowOpacity(opacity) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const val = Math.max(0.1, Math.min(1, opacity / 100));
+  mainWindow.setOpacity(val);
+}
+
 // ============================================================
 //  IPC Handlers
 // ============================================================
@@ -305,6 +312,9 @@ function setupIPC() {
   ipcMain.handle('update-config', (_event, updates) => {
     Object.assign(config, updates);
     saveConfig(config);
+    if (updates.windowOpacity !== undefined) {
+      applyWindowOpacity(config.windowOpacity);
+    }
     return config;
   });
 
@@ -481,6 +491,14 @@ app.whenReady().then(() => {
   killExistingWebviewProcesses();
   setupIPC();
   createWindow();
+  // Apply window opacity on startup; clamp to 40% minimum so the window
+  // is never too faint to interact with.
+  if (config.windowOpacity === undefined) config.windowOpacity = 100;
+  if (config.windowOpacity < 40) {
+    config.windowOpacity = 40;
+    saveConfig(config);
+  }
+  applyWindowOpacity(config.windowOpacity);
   registerAllShortcuts();
   registerDevToolsShortcuts();
 
