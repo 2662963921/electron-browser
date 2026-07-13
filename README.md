@@ -15,6 +15,7 @@
 - **鼠标侧键** — XButton1/XButton2 前进/后退
 - **Shift+Space 上翻** — 按一屏高度向上滚动（替代 PageUp）
 <img width="1340" height="1090" alt="b9325334-274c-4b55-a88d-842e3601836a" src="https://github.com/user-attachments/assets/bda8214e-35a1-4592-b574-805313e69d26" />
+<img width="1340" height="1090" alt="2831edc0-ad36-459c-ab61-683e1f1c875f" src="https://github.com/user-attachments/assets/15e26ba8-9bec-4248-ac4f-516528386002" />
 
 ## 技术栈
 
