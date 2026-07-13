@@ -14,6 +14,7 @@
 - **控件隐藏** — F11 隐藏标题栏和工具栏，沉浸式浏览
 - **鼠标侧键** — XButton1/XButton2 前进/后退
 - **Shift+Space 上翻** — 按一屏高度向上滚动（替代 PageUp）
+<img width="1340" height="1090" alt="b9325334-274c-4b55-a88d-842e3601836a" src="https://github.com/user-attachments/assets/bda8214e-35a1-4592-b574-805313e69d26" />
 
 ## 技术栈
 
