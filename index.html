@@ -1466,25 +1466,42 @@ async function updateBookmarkBtn() {
   btn.classList.toggle('active', isBm);
 }
 
+// Position a dropdown: move to body (escape overflow clipping) + fixed position.
+let ddOriginalParents = {};
+function positionDropdown(btn, dd) {
+  const r = btn.getBoundingClientRect();
+  const gap = 8;
+  if (!dd.__wbParented) {
+    ddOriginalParents[dd.id] = dd.parentNode;
+    dd.__wbParented = true;
+  }
+  document.body.appendChild(dd);
+  dd.style.position = 'fixed';
+  dd.style.top = (r.bottom + gap) + 'px';
+  dd.style.right = (window.innerWidth - r.right) + 'px';
+}
+function detachDropdown(dd) {
+  dd.style.position = '';
+  dd.style.top = '';
+  dd.style.right = '';
+  if (dd.__wbParented && ddOriginalParents[dd.id]) {
+    ddOriginalParents[dd.id].appendChild(dd);
+    dd.__wbParented = false;
+  }
+}
+
 function toggleBookmarkDropdown() {
   const dd = document.getElementById('bookmark-dropdown');
   const btn = document.getElementById('btn-bookmark-list');
   const settingsDD = document.getElementById('settings-dropdown');
   settingsDD.classList.remove('show');
-  settingsDD.style.position = '';
-  settingsDD.style.top = '';
-  settingsDD.style.right = '';
+  detachDropdown(settingsDD);
   document.getElementById('btn-settings').classList.remove('active');
   const isOpen = dd.classList.toggle('show');
   if (isOpen) {
-    const r = btn.getBoundingClientRect();
-    dd.style.position = 'fixed';
-    dd.style.top = (r.bottom + 8) + 'px';
-    dd.style.right = (window.innerWidth - r.right) + 'px';
+    positionDropdown(btn, dd);
   } else {
-    dd.style.position = '';
-    dd.style.top = '';
-    dd.style.right = '';
+    detachDropdown(dd);
   }
   btn.classList.toggle('active', isOpen);
   document.getElementById('dropdown-overlay').classList.toggle('show', isOpen);
@@ -1538,20 +1555,13 @@ function toggleSettingsDropdown() {
   const btn = document.getElementById('btn-settings');
   const bkmDD = document.getElementById('bookmark-dropdown');
   bkmDD.classList.remove('show');
-  bkmDD.style.position = '';
-  bkmDD.style.top = '';
-  bkmDD.style.right = '';
+  detachDropdown(bkmDD);
   document.getElementById('btn-bookmark-list').classList.remove('active');
   const isOpen = dd.classList.toggle('show');
   if (isOpen) {
-    const r = btn.getBoundingClientRect();
-    dd.style.position = 'fixed';
-    dd.style.top = (r.bottom + 8) + 'px';
-    dd.style.right = (window.innerWidth - r.right) + 'px';
+    positionDropdown(btn, dd);
   } else {
-    dd.style.position = '';
-    dd.style.top = '';
-    dd.style.right = '';
+    detachDropdown(dd);
   }
   btn.classList.toggle('active', isOpen);
   document.getElementById('dropdown-overlay').classList.toggle('show', isOpen);
@@ -1565,9 +1575,7 @@ function closeAllDropdowns() {
   ['settings-dropdown', 'bookmark-dropdown'].forEach(id => {
     const el = document.getElementById(id);
     el.classList.remove('show');
-    el.style.position = '';
-    el.style.top = '';
-    el.style.right = '';
+    detachDropdown(el);
   });
   document.getElementById('dropdown-overlay').classList.remove('show');
   document.getElementById('btn-settings').classList.remove('active');
@@ -1991,6 +1999,8 @@ window.addEventListener('resize', () => {
     rafId = requestAnimationFrame(animate);
   }
   inner.addEventListener('wheel', (e) => {
+    // If wheel originated in a dropdown (now on document.body), ignore
+    if (e.target.closest && (e.target.closest('#settings-dropdown') || e.target.closest('#bookmark-dropdown'))) return;
     if (inner.scrollWidth <= inner.clientWidth) return;
     e.preventDefault();
     targetScroll += e.deltaY / 2;
