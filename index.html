@@ -154,7 +154,6 @@ html, body {
   padding: 0 8px;
   gap: 4px;
   overflow-x: auto;
-  overflow-y: hidden;
   scrollbar-width: none; /* Firefox */
 }
 #toolbar-inner::-webkit-scrollbar {
@@ -1469,11 +1468,25 @@ async function updateBookmarkBtn() {
 
 function toggleBookmarkDropdown() {
   const dd = document.getElementById('bookmark-dropdown');
+  const btn = document.getElementById('btn-bookmark-list');
   const settingsDD = document.getElementById('settings-dropdown');
   settingsDD.classList.remove('show');
+  settingsDD.style.position = '';
+  settingsDD.style.top = '';
+  settingsDD.style.right = '';
   document.getElementById('btn-settings').classList.remove('active');
   const isOpen = dd.classList.toggle('show');
-  document.getElementById('btn-bookmark-list').classList.toggle('active', isOpen);
+  if (isOpen) {
+    const r = btn.getBoundingClientRect();
+    dd.style.position = 'fixed';
+    dd.style.top = (r.bottom + 8) + 'px';
+    dd.style.right = (window.innerWidth - r.right) + 'px';
+  } else {
+    dd.style.position = '';
+    dd.style.top = '';
+    dd.style.right = '';
+  }
+  btn.classList.toggle('active', isOpen);
   document.getElementById('dropdown-overlay').classList.toggle('show', isOpen);
   if (isOpen) renderBookmarkDropdown();
 }
@@ -1522,11 +1535,25 @@ async function deleteBookmark(url) {
 
 function toggleSettingsDropdown() {
   const dd = document.getElementById('settings-dropdown');
+  const btn = document.getElementById('btn-settings');
   const bkmDD = document.getElementById('bookmark-dropdown');
   bkmDD.classList.remove('show');
+  bkmDD.style.position = '';
+  bkmDD.style.top = '';
+  bkmDD.style.right = '';
   document.getElementById('btn-bookmark-list').classList.remove('active');
   const isOpen = dd.classList.toggle('show');
-  document.getElementById('btn-settings').classList.toggle('active', isOpen);
+  if (isOpen) {
+    const r = btn.getBoundingClientRect();
+    dd.style.position = 'fixed';
+    dd.style.top = (r.bottom + 8) + 'px';
+    dd.style.right = (window.innerWidth - r.right) + 'px';
+  } else {
+    dd.style.position = '';
+    dd.style.top = '';
+    dd.style.right = '';
+  }
+  btn.classList.toggle('active', isOpen);
   document.getElementById('dropdown-overlay').classList.toggle('show', isOpen);
   if (isOpen) {
     updateSettingsControls();
@@ -1535,8 +1562,13 @@ function toggleSettingsDropdown() {
 }
 
 function closeAllDropdowns() {
-  document.getElementById('settings-dropdown').classList.remove('show');
-  document.getElementById('bookmark-dropdown').classList.remove('show');
+  ['settings-dropdown', 'bookmark-dropdown'].forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.remove('show');
+    el.style.position = '';
+    el.style.top = '';
+    el.style.right = '';
+  });
   document.getElementById('dropdown-overlay').classList.remove('show');
   document.getElementById('btn-settings').classList.remove('active');
   document.getElementById('btn-bookmark-list').classList.remove('active');
